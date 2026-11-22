@@ -25,6 +25,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -131,6 +132,12 @@ public class FlipprPlugin extends Plugin
 	private SearchSuggestionInjector searchSuggestionInjector;
 
 	@Inject
+	private GeFillKey geFillKey;
+
+	@Inject
+	private KeyManager keyManager;
+
+	@Inject
 	private GuidanceGate guidanceGate;
 
 	@Inject
@@ -201,6 +208,7 @@ public class FlipprPlugin extends Plugin
 			.panel(flipprPanel)
 			.build();
 		clientToolbar.addNavigation(navigationButton);
+		keyManager.registerKeyListener(geFillKey);
 		tradeUploader.init();
 		websiteConnection.refreshStatusAsync();
 		// Turned on while already logged in: no LOGGED_IN event will come,
@@ -245,6 +253,7 @@ public class FlipprPlugin extends Plugin
 		overlayManager.remove(geGuideNpcOverlay);
 		overlayManager.remove(portfolioTooltipOverlay);
 		clientToolbar.removeNavigation(navigationButton);
+		keyManager.unregisterKeyListener(geFillKey);
 		log.info("Flippr stopped");
 	}
 

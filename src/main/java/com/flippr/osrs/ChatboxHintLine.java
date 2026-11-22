@@ -95,7 +95,7 @@ public class ChatboxHintLine
 				shiftedTitleY = title.getOriginalY();
 			}
 		}
-		line.setText(GeChatInput.lineText(box, value));
+		line.setText(GeChatInput.lineText(box, value, config.geFillKeybind()));
 		line.setHidden(false);
 		line.revalidate();
 	}

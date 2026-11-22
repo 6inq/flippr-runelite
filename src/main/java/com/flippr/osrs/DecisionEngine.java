@@ -121,8 +121,9 @@ public class DecisionEngine
 		// START_NEW_FLIP/SELL from the website (ServerSuggestions - the
 		// player's plan, or the server's ranked candidates), and MODIFY's new
 		// price when the plan/server has one for that item. Null otherwise.
-		// Shown by ChatboxHintLine under the GE quantity/price boxes as a
-		// hint - never written into them; the player types the value.
+		// Shown by ChatboxHintLine under the GE quantity/price boxes, and put
+		// in them by GeFillKey only on the player's own fill-key press;
+		// never submitted.
 		final Long suggestedPrice;
 		final Long suggestedQuantity;
 		// True when this is about a sell offer (SELL, or MODIFY/ABANDON/HOLD

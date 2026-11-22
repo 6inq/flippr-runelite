@@ -45,14 +45,14 @@ public class GeFillTest
 		assertNull("no box", GeChatInput.valueFor(all, GeChatInput.Box.NONE, WHIP, false));
 	}
 
-	// Req: line text, exact value, no key or action named.
+	// Req: line text, exact value; no key named while no fill key is set.
 	@Test
 	public void lineText()
 	{
-		assertEquals("Flippr price: 1,234", GeChatInput.lineText(GeChatInput.Box.PRICE, 1_234));
-		assertEquals("Flippr quantity: 500", GeChatInput.lineText(GeChatInput.Box.QUANTITY, 500));
-		assertEquals("Flippr price: 6,562,536", GeChatInput.lineText(GeChatInput.Box.PRICE, 6_562_536));
-		assertEquals("Flippr price: 2,147,483,648", GeChatInput.lineText(GeChatInput.Box.PRICE, 2_147_483_648L));
+		assertEquals("Flippr price: 1,234", GeChatInput.lineText(GeChatInput.Box.PRICE, 1_234, net.runelite.client.config.Keybind.NOT_SET));
+		assertEquals("Flippr quantity: 500", GeChatInput.lineText(GeChatInput.Box.QUANTITY, 500, net.runelite.client.config.Keybind.NOT_SET));
+		assertEquals("Flippr price: 6,562,536", GeChatInput.lineText(GeChatInput.Box.PRICE, 6_562_536, net.runelite.client.config.Keybind.NOT_SET));
+		assertEquals("Flippr price: 2,147,483,648", GeChatInput.lineText(GeChatInput.Box.PRICE, 2_147_483_648L, net.runelite.client.config.Keybind.NOT_SET));
 	}
 
 	// Req: the search row shows only a suggested buy with an item - never

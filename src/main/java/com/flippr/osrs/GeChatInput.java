@@ -10,12 +10,13 @@ import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
+import net.runelite.client.config.Keybind;
 
 // The GE's chatbox price / quantity prompt on the "Set up offer" screen:
 // which one is open, for which item and side, and the suggestion value that
-// belongs in it. Read-only: nothing here writes to the prompt - the player
-// types the value and presses Enter themselves. Client thread only; the
-// static helpers are pure (unit tested).
+// belongs in it. Read-only: only GeFillKey writes to the prompt, on the
+// player's own fill-key press, and nothing ever submits it. Client thread
+// only; the static helpers are pure (unit tested).
 @Singleton
 public class GeChatInput
 {
@@ -125,11 +126,13 @@ public class GeChatInput
 			&& (quantityBox ? s.suggestedQuantity != null : s.suggestedPrice != null);
 	}
 
-	// "Flippr price: 1,234" / "Flippr quantity: 500".
-	static String lineText(Box box, long value)
+	// "Flippr price: 1,234" / "Flippr quantity: 500", plus "(press F)" when
+	// a usable fill key is set.
+	static String lineText(Box box, long value, Keybind fillKey)
 	{
 		String number = NumberFormat.getIntegerInstance(Locale.US).format(value);
-		return box == Box.PRICE ? "Flippr price: " + number : "Flippr quantity: " + number;
+		String text = box == Box.PRICE ? "Flippr price: " + number : "Flippr quantity: " + number;
+		return GeFillKey.usable(fillKey) ? text + "  (press " + fillKey + ")" : text;
 	}
 
 	// The prompt open now: a numeric

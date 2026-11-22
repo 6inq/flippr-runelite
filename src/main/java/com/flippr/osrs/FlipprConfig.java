@@ -5,6 +5,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
+import net.runelite.client.config.Keybind;
 
 @ConfigGroup("flippr")
 public interface FlipprConfig extends Config
@@ -236,6 +237,20 @@ public interface FlipprConfig extends Config
 	default boolean geFillLine()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = "geFillKeybind",
+		name = "Fill keybind",
+		description = "Press this key while the GE price or quantity box is open for Flippr's suggested item to "
+			+ "put Flippr's value in the box. You still press Enter yourself. Off until you pick a key. "
+			+ "Modifier keys (Shift, Ctrl, Alt) and Enter are not supported.",
+		section = geGuidanceSection,
+		position = 7
+	)
+	default Keybind geFillKeybind()
+	{
+		return Keybind.NOT_SET;
 	}
 
 	@ConfigItem(

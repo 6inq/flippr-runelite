@@ -14,7 +14,8 @@ account at [flippr.exchange](https://flippr.exchange) is optional and only syncs
 - **GE guidance:** highlights the next thing to click (slot, item, price, quantity, Confirm, Collect).
   It only draws on the screen. You do every click yourself.
 - **Price and quantity hints:** while the GE price or quantity box is open, a line in the chatbox shows the
-  suggested number. You type it yourself.
+  suggested number. You type it yourself, or set a "Fill keybind" in the settings (off by default) and press
+  that key to put the number in the box. You always press Enter yourself.
 - **Tracker and History:** profit per flip, per item and over time, with tax included.
 - **Prices:** search any item for its latest buy and sell prices.
 - **Notifications:** offer completed, price alerts, slot free and more. Each one has its own toggle and uses
