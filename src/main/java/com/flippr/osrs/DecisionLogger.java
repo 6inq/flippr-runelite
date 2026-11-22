@@ -1,10 +1,7 @@
 package com.flippr.osrs;
 
 import com.google.gson.Gson;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 
@@ -14,8 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DecisionLogger
 {
-	private static final Path LOG_DIR = FlipprFiles.DIR;
-	private static final Path LOG_FILE = FlipprFiles.DECISIONS;
+	private static final String LOG_FILE = FlipprFiles.DECISIONS;
+
+	@Inject
+	private FlipprFiles files;
+
 	// RuneLite's shared Gson (Plugin Hub rule: no private Gson instances).
 	@Inject
 	Gson gson;
@@ -33,12 +33,7 @@ public class DecisionLogger
 		entry.suggestion = suggestion;
 		try
 		{
-			Files.createDirectories(LOG_DIR);
-			try (FileWriter writer = new FileWriter(LOG_FILE.toFile(), true))
-			{
-				writer.write(gson.toJson(entry));
-				writer.write(System.lineSeparator());
-			}
+			files.appendLine(LOG_FILE, gson.toJson(entry));
 		}
 		catch (IOException e)
 		{

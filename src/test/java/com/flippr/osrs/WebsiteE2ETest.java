@@ -109,8 +109,6 @@ public class WebsiteE2ETest
 		{
 			assertTrue(status.body, parsed.characterName.equalsIgnoreCase(CHARACTER));
 		}
-		assertNotNull("status must include seat", parsed.seat);
-		assertNotNull("status must include premiumGames", parsed.premiumGames);
 
 		WebsiteConnection.ApiResponse plan = get(ServerSuggestions.PLAN_PATH);
 		assertEquals(plan.body, WebsiteConnection.Outcome.OK, plan.outcome);

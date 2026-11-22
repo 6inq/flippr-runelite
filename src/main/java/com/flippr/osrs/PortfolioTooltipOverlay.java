@@ -36,7 +36,7 @@ import net.runelite.client.util.QuantityFormatter;
 // Purely informational - reads widget/inventory/price state, never
 // modifies anything - so this stays on even during Watch Mode, unlike the
 // UI-touching classes Watch Mode gates (SearchSuggestionInjector,
-// QuickFillHandler, etc.): "watching the portfolio" is explicitly the one
+// ChatboxHintLine, etc.): "watching the portfolio" is explicitly the one
 // thing Watch Mode is supposed to keep doing.
 public class PortfolioTooltipOverlay extends Overlay
 {

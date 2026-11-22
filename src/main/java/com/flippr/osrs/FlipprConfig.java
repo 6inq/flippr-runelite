@@ -5,7 +5,6 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
-import net.runelite.client.config.Keybind;
 
 @ConfigGroup("flippr")
 public interface FlipprConfig extends Config
@@ -229,9 +228,8 @@ public interface FlipprConfig extends Config
 	@ConfigItem(
 		keyName = "geFillLine",
 		name = "Price / quantity line",
-		description = "When the GE price or quantity box is open for the suggested item, show a clickable "
-			+ "\"Flippr price: 1,234 gp\" / \"Flippr quantity: 500\" line in the chatbox. Clicking it types the "
-			+ "value into the box; you still press Enter yourself.",
+		description = "When the GE price or quantity box is open for the suggested item, show the suggested "
+			+ "value as a \"Flippr price: 1,234\" / \"Flippr quantity: 500\" line in the chatbox, for you to type in.",
 		section = geGuidanceSection,
 		position = 6
 	)
@@ -241,37 +239,11 @@ public interface FlipprConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "quickFillEnabled",
-		name = "Fill on keypress",
-		description = "While the GE price-per-item or quantity box is open for the suggested item, pressing the "
-			+ "fill key (Shift by default) types Flippr's value into the box. It never presses Enter - you submit "
-			+ "it yourself. The clickable chatbox line does the same.",
-		section = geGuidanceSection,
-		position = 7
-	)
-	default boolean quickFillEnabled()
-	{
-		return true;
-	}
-
-	@ConfigItem(
-		keyName = "quickSetKeybind",
-		name = "Fill keybind",
-		description = "The key for \"Fill on keypress\" (default Shift). Enter is never used as the fill key.",
-		section = geGuidanceSection,
-		position = 8
-	)
-	default Keybind quickSetKeybind()
-	{
-		return Keybind.SHIFT;
-	}
-
-	@ConfigItem(
 		keyName = "showSuggestedItemInSearch",
 		name = "Suggested item in GE search",
 		description = "When you open the GE item search for the suggested buy, show the item as the first, "
 			+ "selectable result (where the game shows your previous search) so it's one click. You still "
-			+ "click it or press Enter yourself. Steps aside if another plugin already shows an item there.",
+			+ "click it or press Enter yourself. Steps aside if an item is already shown there.",
 		section = geGuidanceSection,
 		position = 9
 	)

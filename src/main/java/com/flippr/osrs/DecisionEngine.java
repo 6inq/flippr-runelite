@@ -121,13 +121,12 @@ public class DecisionEngine
 		// START_NEW_FLIP/SELL from the website (ServerSuggestions - the
 		// player's plan, or the server's ranked candidates), and MODIFY's new
 		// price when the plan/server has one for that item. Null otherwise.
-		// Read by QuickFillHandler to fill the GE quantity/price boxes on a
-		// keypress - never written automatically, the player still presses
-		// the key and Enter themselves for real.
+		// Shown by ChatboxHintLine under the GE quantity/price boxes as a
+		// hint - never written into them; the player types the value.
 		final Long suggestedPrice;
 		final Long suggestedQuantity;
 		// True when this is about a sell offer (SELL, or MODIFY/ABANDON/HOLD
-		// of a sell) - QuickFillHandler only fills a box on the same side.
+		// of a sell) - the chatbox hint only shows for a box on the same side.
 		final boolean sellSide;
 
 		Suggestion(String key, String message, SuggestionType type, int slot, int itemId, String itemName)

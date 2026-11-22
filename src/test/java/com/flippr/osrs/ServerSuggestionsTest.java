@@ -37,7 +37,8 @@ import org.mockito.Spy;
 // slots - plan positions are the source of truth; otherwise the best
 // candidates not already held, sized by server quantity, remaining 4h buy
 // limit and an equal share of spendable coins above the reserve floor.
-// gated / 401 / maintenance / network errors fall back to local behaviour.
+// Unknown extra reply fields are ignored; 401 / maintenance /
+// network errors fall back to local behaviour.
 // The website is a mock; responses are canned JSON in the site's shape.
 public class ServerSuggestionsTest
 {
@@ -343,12 +344,13 @@ public class ServerSuggestionsTest
 		verify(website, never()).getAsync(eq(ServerSuggestions.FLIPS_PATH), any());
 	}
 
-	// Req: no plan -> /flips candidates; gated: true is remembered for the panel.
+	// Req: no plan -> /flips candidates; unknown extra fields on the reply
+	// change nothing - the candidates are used as sent.
 	@Test
-	public void noPlanFallsBackToFlipsAndRemembersGating()
+	public void noPlanFallsBackToFlipsIgnoringExtraFields()
 	{
 		responses.put(ServerSuggestions.PLAN_PATH, "{\"game\":\"osrs\",\"plan\":null,\"positions\":[]}");
-		responses.put(ServerSuggestions.FLIPS_PATH, "{\"game\":\"osrs\",\"gated\":true,\"reason\":\"p2p_requires_premium\","
+		responses.put(ServerSuggestions.FLIPS_PATH, "{\"game\":\"osrs\",\"note\":\"extra\",\"meta\":{\"source\":\"x\"},"
 			+ "\"flips\":[{\"id\":13190,\"name\":\"Old school bond\",\"members\":false,\"buyLimit\":100,"
 			+ "\"buyPrice\":10592523,\"sellPrice\":11000000,\"profitPerUnit\":187477,\"quantity\":100,"
 			+ "\"expectedProfit\":18747700,\"confidence\":0.71}]}");
@@ -357,7 +359,7 @@ public class ServerSuggestionsTest
 
 		suggestions.maybeFetch();
 
-		assertTrue(suggestions.isGated());
+		assertNotNull(suggestions.getData());
 		List<ServerSuggestions.Pick> picks = suggestions.currentPicks(Collections.emptySet(), 1);
 		assertPick(picks.get(0), BOND, false, 10_592_523, 97);
 	}

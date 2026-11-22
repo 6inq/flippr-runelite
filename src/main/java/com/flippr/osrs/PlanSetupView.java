@@ -26,7 +26,7 @@ import net.runelite.client.ui.FontManager;
 // The Plan tab's "Plan setup" card - the website's "Set up your plan" form
 // (PlanSetup holds the rules): capital with an "= N gp" preview, GE slots
 // (the ones in use can't be dropped), style, fill window, max per slot,
-// account (F2P only without Premium), keep vs reinvest; Build / Rebuild
+// account (F2P / members / both), keep vs reinvest; Build / Rebuild
 // (asks first) -> POST /api/v1/osrs/plan/build, then the plan is read again.
 // Expanded while there's no plan, behind "Change plan" otherwise. The
 // plan's "Auto-update prices" / "Auto-fill free slots" switches sit on the
@@ -61,7 +61,6 @@ public class PlanSetupView extends JPanel
 	private final JLabel capitalHint = Ui.small("", Ui.MUTED);
 	private final JLabel slotsHint = Ui.wrapped("", Ui.MUTED);
 	private final JLabel styleHint = Ui.small("", Ui.MUTED);
-	private final JLabel accountHint = Ui.wrapped("", Ui.MUTED);
 	private final JLabel reinvestHint = Ui.wrapped("", Ui.MUTED);
 	private final JButton build = Ui.button("Build plan");
 	private final JLabel error = Ui.wrapped("", Ui.MUTED);
@@ -73,7 +72,7 @@ public class PlanSetupView extends JPanel
 	private final List<JToggleButton> reinvestButtons = new ArrayList<>();
 
 	private PlanSetup.Form form = new PlanSetup.Form();
-	// The plan + Premium the form was filled from; edits keep the form.
+	// The plan the form was filled from; edits keep the form.
 	private String source;
 	private boolean dirty;
 	// null: follow the plan (open without one); else the player's pick.
@@ -181,7 +180,6 @@ public class PlanSetupView extends JPanel
 		body.add(Ui.wrapped(PlanSetup.FILL_WINDOW_HINT, Ui.MUTED));
 		group("Max per slot", new String[]{"Off", "25%", "33%", "50%"}, maxButtons, i -> pick(f -> f.maxPerSlotPct = PlanSetup.MAX_PER_SLOT.get(i)));
 		group("Account", PlanSetup.ACCOUNT_LABELS, accountButtons, i -> pick(f -> f.account = PlanSetup.ACCOUNTS[i]));
-		body.add(accountHint);
 		group("When a flip completes", new String[]{"Keep to bank", "Reinvest"}, reinvestButtons, i -> pick(f -> f.reinvest = i == 1));
 		body.add(reinvestHint);
 		body.add(Ui.gap(6));
@@ -251,12 +249,6 @@ public class PlanSetupView extends JPanel
 		return d != null && d.hasPlan() ? d.planInfo : null;
 	}
 
-	private boolean premium()
-	{
-		WebsiteConnection.Status status = website.getLastStatus();
-		return status != null && status.premium;
-	}
-
 	private int slotsInUse()
 	{
 		ServerSuggestions.Data d = data();
@@ -314,10 +306,10 @@ public class PlanSetupView extends JPanel
 
 		if (open)
 		{
-			String src = (plan == null ? "none" : plan.id + "/" + plan.capital + "/" + plan.slots + "/" + plan.createdAt) + "|" + premium();
+			String src = (plan == null ? "none" : plan.id + "/" + plan.capital + "/" + plan.slots + "/" + plan.createdAt);
 			if (!dirty && !Objects.equals(src, source))
 			{
-				form = PlanSetup.initialForm(plan, premium());
+				form = PlanSetup.initialForm(plan);
 				source = src;
 				syncingControls = true;
 				capital.setText(form.capital);
@@ -344,7 +336,6 @@ public class PlanSetupView extends JPanel
 	private void syncControls()
 	{
 		syncingControls = true;
-		boolean premium = premium();
 		int inUse = slotsInUse();
 		int floor = PlanSetup.minSlots(inUse);
 		int slots = Math.max(form.slots, floor);
@@ -360,8 +351,7 @@ public class PlanSetupView extends JPanel
 		}
 		select(fillButtons, fill, i -> true);
 		select(maxButtons, Math.max(0, PlanSetup.MAX_PER_SLOT.indexOf(form.maxPerSlotPct)), i -> true);
-		String account = premium ? form.account : "f2p";
-		select(accountButtons, java.util.Arrays.asList(PlanSetup.ACCOUNTS).indexOf(account), i -> premium || i == 2);
+		select(accountButtons, java.util.Arrays.asList(PlanSetup.ACCOUNTS).indexOf(form.account), i -> true);
 		select(reinvestButtons, form.reinvest ? 1 : 0, i -> true);
 		syncingControls = false;
 
@@ -371,8 +361,6 @@ public class PlanSetupView extends JPanel
 		slotsHint.setText(htmlWrap(inUse > 0 ? inUse + " already in use by positions in progress; they keep their slots." : ""));
 		slotsHint.setVisible(inUse > 0);
 		styleHint.setText(PlanSetup.STYLE_HINTS["highTicket".equals(form.style) ? 1 : 0]);
-		accountHint.setText(htmlWrap("Free: F2P items only. Members items need Premium."));
-		accountHint.setVisible(!premium);
 		reinvestHint.setText(htmlWrap(form.reinvest ? "Each slot's profit rolls into its next flip."
 			: "Next flips use your original capital."));
 		boolean hasPlan = plan() != null;
@@ -411,7 +399,7 @@ public class PlanSetupView extends JPanel
 			return;
 		}
 		boolean hasPlan = plan() != null;
-		PlanSetup.Request request = PlanSetup.buildRequest(form, premium(), slotsInUse());
+		PlanSetup.Request request = PlanSetup.buildRequest(form, slotsInUse());
 		if (request.error != null)
 		{
 			showError(error, request.error);

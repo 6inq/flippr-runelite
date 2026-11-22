@@ -2,8 +2,6 @@ package com.flippr.osrs;
 
 import com.google.gson.Gson;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -61,7 +59,7 @@ public class MultiAccountAggregator
 		}
 	}
 
-	private static final Path LOG_FILE = FlipprFiles.FLIPS;
+	private static final String LOG_FILE = FlipprFiles.FLIPS;
 	// Matches FlipTracker's own convention for dayOfWeek/hourOfDay - "today"
 	// means the same fixed zone throughout this plugin, not the JVM's
 	// possibly-different default zone.
@@ -73,6 +71,9 @@ public class MultiAccountAggregator
 
 	@Inject
 	private Client client;
+
+	@Inject
+	private FlipprFiles files;
 
 	// RuneLite's shared Gson (Plugin Hub rule: no private Gson instances).
 	@Inject
@@ -112,18 +113,12 @@ public class MultiAccountAggregator
 
 	private void refresh()
 	{
-		if (!Files.exists(LOG_FILE))
-		{
-			lastSummaries = List.of();
-			return;
-		}
-
 		LocalDate today = LocalDate.now(FLIP_TIME_ZONE);
 		Map<String, long[]> totals = new LinkedHashMap<>();
 
 		try
 		{
-			List<String> lines = Files.readAllLines(LOG_FILE);
+			List<String> lines = files.readLines(LOG_FILE);
 			for (String line : lines)
 			{
 				if (line.isBlank())

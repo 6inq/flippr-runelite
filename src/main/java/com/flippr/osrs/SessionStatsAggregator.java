@@ -2,8 +2,6 @@ package com.flippr.osrs;
 
 import com.google.gson.Gson;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -13,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
 
-// Real, file-based aggregation over the shared ~/.runelite/flippr/flips.jsonl
+// Real, file-based aggregation over the shared flips.jsonl
 // for FlipprPanel's session time-range/account dropdowns - everything
 // except the "Session" time-range option (which stays on FlipTracker's own
 // live in-memory counters, zero regression from existing behavior) needs to
@@ -23,7 +21,7 @@ import net.runelite.api.Player;
 @Singleton
 public class SessionStatsAggregator
 {
-	private static final Path LOG_FILE = FlipprFiles.FLIPS;
+	private static final String LOG_FILE = FlipprFiles.FLIPS;
 
 	public static class Stats
 	{
@@ -60,6 +58,9 @@ public class SessionStatsAggregator
 	@Inject
 	private Client client;
 
+	@Inject
+	private FlipprFiles files;
+
 	// RuneLite's shared Gson (Plugin Hub rule: no private Gson instances).
 	@Inject
 	Gson gson;
@@ -69,15 +70,10 @@ public class SessionStatsAggregator
 	// or every account's if rsnFilter is null ("All accounts").
 	public Stats aggregate(long sinceEpochMs, String rsnFilter)
 	{
-		if (!Files.exists(LOG_FILE))
-		{
-			return new Stats(0, 0, 0);
-		}
-
 		List<String> lines;
 		try
 		{
-			lines = Files.readAllLines(LOG_FILE);
+			lines = files.readLines(LOG_FILE);
 		}
 		catch (IOException e)
 		{
@@ -140,36 +136,33 @@ public class SessionStatsAggregator
 			accounts.add(currentRsn);
 		}
 
-		if (Files.exists(LOG_FILE))
+		try
 		{
-			try
+			List<String> lines = files.readLines(LOG_FILE);
+			for (String line : lines)
 			{
-				List<String> lines = Files.readAllLines(LOG_FILE);
-				for (String line : lines)
+				if (line.isBlank())
 				{
-					if (line.isBlank())
+					continue;
+				}
+				try
+				{
+					CompletedFlip flip = gson.fromJson(line, CompletedFlip.class);
+					if (flip != null && flip.rsn != null)
 					{
-						continue;
-					}
-					try
-					{
-						CompletedFlip flip = gson.fromJson(line, CompletedFlip.class);
-						if (flip != null && flip.rsn != null)
-						{
-							accounts.add(flip.rsn);
-						}
-					}
-					catch (Exception e)
-					{
-						// Skip a malformed line rather than aborting the
-						// whole scan over it.
+						accounts.add(flip.rsn);
 					}
 				}
+				catch (Exception e)
+				{
+					// Skip a malformed line rather than aborting the
+					// whole scan over it.
+				}
 			}
-			catch (IOException e)
-			{
-				log.warn("Failed to read {} for known accounts", LOG_FILE, e);
-			}
+		}
+		catch (IOException e)
+		{
+			log.warn("Failed to read {} for known accounts", LOG_FILE, e);
 		}
 
 		return List.copyOf(accounts);

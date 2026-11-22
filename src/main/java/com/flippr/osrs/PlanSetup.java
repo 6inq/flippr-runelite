@@ -185,8 +185,8 @@ final class PlanSetup
 		return false;
 	}
 
-	// The active plan's settings, else the defaults. Without Premium only F2P.
-	static Form initialForm(ServerSuggestions.PlanInfo plan, boolean premium)
+	// The active plan's settings, else the defaults.
+	static Form initialForm(ServerSuggestions.PlanInfo plan)
 	{
 		Form f = new Form();
 		if (plan != null)
@@ -199,10 +199,6 @@ final class PlanSetup
 			f.maxPerSlotPct = MAX_PER_SLOT.contains(pct) ? pct : null;
 			f.account = Arrays.asList(ACCOUNTS).contains(plan.account) ? plan.account : "both";
 			f.reinvest = plan.reinvest;
-		}
-		if (!premium)
-		{
-			f.account = "f2p";
 		}
 		return f;
 	}
@@ -220,9 +216,9 @@ final class PlanSetup
 		}
 	}
 
-	// maxPerSlotPct is left out when Off; without Premium the account is F2P
-	// (the site forces it too); slots never drop below the ones in use + 1.
-	static Request buildRequest(Form form, boolean premium, int slotsInUse)
+	// maxPerSlotPct is left out when Off; the account is the one the player
+	// picked; slots never drop below the ones in use + 1.
+	static Request buildRequest(Form form, int slotsInUse)
 	{
 		Long capital = parseCapital(form.capital);
 		if (capital == null)
@@ -242,7 +238,7 @@ final class PlanSetup
 		{
 			body.put("maxPerSlotPct", form.maxPerSlotPct);
 		}
-		body.put("account", premium && Arrays.asList(ACCOUNTS).contains(form.account) ? form.account : "f2p");
+		body.put("account", Arrays.asList(ACCOUNTS).contains(form.account) ? form.account : "both");
 		body.put("reinvest", form.reinvest);
 		return new Request(body, null);
 	}

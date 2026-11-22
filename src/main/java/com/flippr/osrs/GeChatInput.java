@@ -10,14 +10,12 @@ import net.runelite.api.gameval.VarClientID;
 import net.runelite.api.gameval.VarPlayerID;
 import net.runelite.api.gameval.VarbitID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.client.config.Keybind;
 
 // The GE's chatbox price / quantity prompt on the "Set up offer" screen:
-// which one is open, for which item and side, the suggestion value that
-// belongs in it, and typing that value into it. Typing means what typing
-// does - the input widget's text and the input VarClientStr - and nothing
-// else: the player still presses Enter. Client thread only; the static
-// helpers are pure (unit tested).
+// which one is open, for which item and side, and the suggestion value that
+// belongs in it. Read-only: nothing here writes to the prompt - the player
+// types the value and presses Enter themselves. Client thread only; the
+// static helpers are pure (unit tested).
 @Singleton
 public class GeChatInput
 {
@@ -81,7 +79,7 @@ public class GeChatInput
 	}
 
 	// The suggestion value for this box, or null: the suggestion has to be
-	// for this item and side (QuickFillHandler.findSuggestion).
+	// for this item and side (findSuggestion).
 	static Long valueFor(DecisionEngine.Suggestion[] suggestions, Box box, int itemId, boolean sell)
 	{
 		return valueFor(suggestions, box, itemId, sell, false);
@@ -95,21 +93,43 @@ public class GeChatInput
 			return null;
 		}
 		boolean quantity = box == Box.QUANTITY;
-		DecisionEngine.Suggestion s = QuickFillHandler.findSuggestion(suggestions, itemId, sell, quantity);
+		DecisionEngine.Suggestion s = findSuggestion(suggestions, itemId, sell, quantity);
 		return s == null ? null : quantity ? s.suggestedQuantity : s.suggestedPrice;
 	}
 
-	// "Flippr price: 1,234 gp" / "Flippr quantity: 500", with the key when
-	// fill-on-keypress is on.
-	static String lineText(Box box, long value, Keybind keybind, boolean keybindOn)
+	// The suggestion for this item, on the same side (buy/sell) as the open
+	// box, with a value for the box (quantity or price). The one the overlay
+	// highlights wins when it qualifies; otherwise the first qualifying slot.
+	// Null = nothing to show.
+	static DecisionEngine.Suggestion findSuggestion(DecisionEngine.Suggestion[] suggestions, int itemId, boolean sellBox,
+		boolean quantityBox)
+	{
+		DecisionEngine.Suggestion highlighted = SuggestionOverlay.pickOneToHighlight(suggestions);
+		if (matches(highlighted, itemId, sellBox, quantityBox))
+		{
+			return highlighted;
+		}
+		for (DecisionEngine.Suggestion suggestion : suggestions)
+		{
+			if (matches(suggestion, itemId, sellBox, quantityBox))
+			{
+				return suggestion;
+			}
+		}
+		return null;
+	}
+
+	private static boolean matches(DecisionEngine.Suggestion s, int itemId, boolean sellBox, boolean quantityBox)
+	{
+		return s != null && itemId > 0 && s.itemId == itemId && s.sellSide == sellBox
+			&& (quantityBox ? s.suggestedQuantity != null : s.suggestedPrice != null);
+	}
+
+	// "Flippr price: 1,234" / "Flippr quantity: 500".
+	static String lineText(Box box, long value)
 	{
 		String number = NumberFormat.getIntegerInstance(Locale.US).format(value);
-		String text = box == Box.PRICE ? "Flippr price: " + number + " gp" : "Flippr quantity: " + number;
-		if (keybindOn && keybind != null && !Keybind.NOT_SET.equals(keybind))
-		{
-			text += "  (or press " + keybind + ")";
-		}
-		return text;
+		return box == Box.PRICE ? "Flippr price: " + number : "Flippr quantity: " + number;
 	}
 
 	// The prompt open now: a numeric
@@ -153,41 +173,5 @@ public class GeChatInput
 	Long suggestedValue(DecisionEngine.Suggestion[] suggestions)
 	{
 		return valueFor(suggestions, openBox(), setupItemId(), setupIsSell(), serverSuggestions.isSellOnly());
-	}
-
-	// Why there is nothing to fill now, or null when there is (for the log).
-	String skipReason(DecisionEngine.Suggestion[] suggestions)
-	{
-		Box box = openBox();
-		if (box == Box.NONE)
-		{
-			return "no GE price/quantity prompt open (mode=" + client.getVarcIntValue(VarClientID.MESLAYERMODE) + ")";
-		}
-		boolean sell = setupIsSell();
-		if (!sell && serverSuggestions.isSellOnly())
-		{
-			return "sell-only mode, buy offer";
-		}
-		if (valueFor(suggestions, box, setupItemId(), sell, false) == null)
-		{
-			return "no Flippr " + (sell ? "sell" : "buy") + " suggestion with a " + box.name().toLowerCase()
-				+ " for item " + setupItemId();
-		}
-		return null;
-	}
-
-	// Types the value into the open prompt, as typing it would (the input
-	// line's text with its cursor, and the input VarClientStr). Never
-	// submits: the player presses Enter.
-	boolean type(long value)
-	{
-		Widget input = client.getWidget(InterfaceID.Chatbox.MES_TEXT2);
-		if (input == null)
-		{
-			return false;
-		}
-		input.setText(value + "*");
-		client.setVarcStrValue(VarClientID.MESLAYERINPUT, String.valueOf(value));
-		return true;
 	}
 }

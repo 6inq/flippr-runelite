@@ -29,7 +29,8 @@ import org.mockito.Spy;
 
 // Requirement: the Plan tab's Plan setup works like the site / RS3 app -
 // capital shorthand with an "= N gp" preview, the form opens with the
-// plan's settings (F2P only without Premium), the build body the site's
+// plan's settings, the account the player picks (F2P / members / both)
+// is always sent as picked, the build body the site's
 // POST /api/v1/osrs/plan/build takes (slots never below the ones in use + 1,
 // max per slot left out when Off), inline errors; the plan switches PATCH
 // /api/v1/osrs/plan/settings with one field (absent = on). Also: the sidebar
@@ -134,11 +135,11 @@ public class PlanSetupTest
 		return p;
 	}
 
-	// Req: the form opens with the plan's settings; defaults without one; F2P without Premium.
+	// Req: the form opens with the plan's settings; defaults without one.
 	@Test
 	public void initialForm()
 	{
-		PlanSetup.Form f = PlanSetup.initialForm(plan(), true);
+		PlanSetup.Form f = PlanSetup.initialForm(plan());
 		assertEquals("24m", f.capital);
 		assertEquals(6, f.slots);
 		assertEquals("highTicket", f.style);
@@ -146,9 +147,8 @@ public class PlanSetupTest
 		assertEquals(Integer.valueOf(33), f.maxPerSlotPct);
 		assertEquals("members", f.account);
 		assertTrue(f.reinvest);
-		assertEquals("f2p", PlanSetup.initialForm(plan(), false).account);
 
-		PlanSetup.Form d = PlanSetup.initialForm(null, true);
+		PlanSetup.Form d = PlanSetup.initialForm(null);
 		assertEquals("", d.capital);
 		assertEquals(8, d.slots);
 		assertEquals("volume", d.style);
@@ -162,8 +162,8 @@ public class PlanSetupTest
 	@Test
 	public void buildBody()
 	{
-		PlanSetup.Form f = PlanSetup.initialForm(plan(), true);
-		Map<String, Object> body = PlanSetup.buildRequest(f, true, 0).body;
+		PlanSetup.Form f = PlanSetup.initialForm(plan());
+		Map<String, Object> body = PlanSetup.buildRequest(f, 0).body;
 		JsonObject json = gson.fromJson(gson.toJson(body), JsonObject.class);
 		assertEquals(24_000_000L, json.get("capital").getAsLong());
 		assertEquals(6, json.get("slots").getAsInt());
@@ -175,15 +175,20 @@ public class PlanSetupTest
 
 		f.maxPerSlotPct = null;
 		f.slots = 2;
-		Map<String, Object> rebuilt = PlanSetup.buildRequest(f, false, 4).body;
+		Map<String, Object> rebuilt = PlanSetup.buildRequest(f, 4).body;
 		assertFalse("Off: left out", rebuilt.containsKey("maxPerSlotPct"));
 		assertEquals("in use 4 -> at least 5", 5, rebuilt.get("slots"));
-		assertEquals("no Premium: F2P", "f2p", rebuilt.get("account"));
+		assertEquals("the picked account is sent as is", "members", rebuilt.get("account"));
+		for (String account : PlanSetup.ACCOUNTS)
+		{
+			f.account = account;
+			assertEquals(account, PlanSetup.buildRequest(f, 0).body.get("account"));
+		}
 
 		f.capital = "lots";
-		assertEquals(PlanSetup.CAPITAL_ERROR, PlanSetup.buildRequest(f, true, 0).error);
+		assertEquals(PlanSetup.CAPITAL_ERROR, PlanSetup.buildRequest(f, 0).error);
 		f.capital = "0";
-		assertEquals("Capital must be at least 1 gp.", PlanSetup.buildRequest(f, true, 0).error);
+		assertEquals("Capital must be at least 1 gp.", PlanSetup.buildRequest(f, 0).error);
 		assertEquals(8, PlanSetup.minSlots(9));
 		assertEquals(1, PlanSetup.minSlots(0));
 	}
@@ -226,12 +231,12 @@ public class PlanSetupTest
 	public void buildRequestAndError()
 	{
 		List<ServerSuggestions.StopResult> results = new ArrayList<>();
-		suggestions.buildPlan(PlanSetup.buildRequest(PlanSetup.initialForm(plan(), true), true, 0).body, results::add);
+		suggestions.buildPlan(PlanSetup.buildRequest(PlanSetup.initialForm(plan()), 0).body, results::add);
 		assertTrue(sent.get(0).startsWith("POST /api/v1/osrs/plan/build {\"capital\":24000000,\"slots\":6,"));
 		assertTrue(results.get(0).ok);
 
 		answer = new WebsiteConnection.ApiResponse(WebsiteConnection.Outcome.FAILED, 400, "{\"error\":\"capital must be at least 1 gp.\"}");
-		suggestions.buildPlan(PlanSetup.buildRequest(PlanSetup.initialForm(plan(), true), true, 0).body, results::add);
+		suggestions.buildPlan(PlanSetup.buildRequest(PlanSetup.initialForm(plan()), 0).body, results::add);
 		assertFalse(results.get(1).ok);
 		assertEquals("capital must be at least 1 gp.", results.get(1).error);
 
@@ -241,7 +246,7 @@ public class PlanSetupTest
 
 		when(website.isSyncEnabled()).thenReturn(false);
 		sent.clear();
-		suggestions.buildPlan(PlanSetup.buildRequest(PlanSetup.initialForm(plan(), true), true, 0).body, results::add);
+		suggestions.buildPlan(PlanSetup.buildRequest(PlanSetup.initialForm(plan()), 0).body, results::add);
 		assertTrue(sent.isEmpty());
 		assertFalse(results.get(3).ok);
 	}

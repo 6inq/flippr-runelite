@@ -4,8 +4,8 @@ A Grand Exchange flipping tool for Old School RuneScape. Flippr suggests what to
 keeps a live plan of your eight GE slots, shows you which button to press next, and tracks the profit of
 every flip.
 
-It works on its own, and gets smarter when paired with a free account at
-[flippr.exchange](https://flippr.exchange).
+Every feature is free, members items included, and it works without an account. Pairing with a free
+account at [flippr.exchange](https://flippr.exchange) is optional and only syncs your own trades.
 
 ## Features
 
@@ -13,19 +13,12 @@ It works on its own, and gets smarter when paired with a free account at
 - **Plan:** a live board of your GE slots: Pending, Buying, Bought, Selling, with exact listed prices.
 - **GE guidance:** highlights the next thing to click (slot, item, price, quantity, Confirm, Collect).
   It only draws on the screen. You do every click yourself.
-- **Price and quantity helper:** a "Flippr price / quantity" line in the chatbox, and an optional key
-  that fills the suggested number into the GE price or quantity box while that box is open. Nothing is ever
-  submitted for you: you always press Enter yourself.
+- **Price and quantity hints:** while the GE price or quantity box is open, a line in the chatbox shows the
+  suggested number. You type it yourself.
 - **Tracker and History:** profit per flip, per item and over time, with tax included.
 - **Prices:** search any item for its latest buy and sell prices.
 - **Notifications:** offer completed, price alerts, slot free and more. Each one has its own toggle and uses
   RuneLite's own notification settings.
-
-## Free and Premium
-
-Everything for free-to-play items is free. Members (P2P) item suggestions in the Plan come from the
-Flippr service and need Flippr Premium. The rest of the plugin (tracking, history, prices, GE guidance
-for your own offers) works without it.
 
 ## Pairing with flippr.exchange (optional)
 
@@ -43,7 +36,7 @@ come from the [OSRS Wiki real-time prices API](https://prices.runescape.wiki).
 
 ## Local files
 
-The plugin keeps a log of your own flips in `.runelite/flippr` on your computer. It is not uploaded unless
+The plugin keeps a log of your own flips in RuneLite's plugin data folder (`.runelite/plugin-data/flippr`) on your computer. It is not uploaded unless
 you pair and sync.
 
 ## Support

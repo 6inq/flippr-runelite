@@ -2,7 +2,6 @@ package com.flippr.osrs;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,9 +29,9 @@ public class CancelledOfferWatcher
 	// arrive in the first ticks after login / a world hop).
 	static final int LOAD_TICKS = 10;
 	static final String SEEN_KEY = "geSeenPositions";
-	private static final Type LIST = new TypeToken<List<String>>()
+	private static final TypeToken<List<String>> LIST = new TypeToken<List<String>>()
 	{
-	}.getType();
+	};
 
 	@Inject
 	private Client client;
@@ -153,7 +152,7 @@ public class CancelledOfferWatcher
 			try
 			{
 				String json = configManager.getConfiguration("flippr", SEEN_KEY);
-				saved = json == null || json.isEmpty() ? null : gson.fromJson(json, LIST);
+				saved = json == null || json.isEmpty() ? null : gson.fromJson(json, LIST.getType());
 			}
 			catch (RuntimeException e)
 			{

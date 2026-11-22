@@ -51,7 +51,7 @@ final class PlanText
 		return s.endsWith(".0") ? s.substring(0, s.length() - 2) : s;
 	}
 
-	// "+1.2M gp", "-950 gp", "0 gp".
+	// "+1.2M gp", "-800 gp", "0 gp".
 	static String signedGp(double n)
 	{
 		return (n > 0 ? "+" : "") + compactGp(n) + " gp";

@@ -2,7 +2,6 @@ package com.flippr.osrs;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.LongSupplier;
@@ -23,9 +22,9 @@ import net.runelite.client.config.ConfigManager;
 public class PlanNotifier
 {
 	static final String SENT_KEYS_KEY = "notifySentKeys";
-	private static final Type KEY_LIST = new TypeToken<List<String>>()
+	private static final TypeToken<List<String>> KEY_LIST = new TypeToken<List<String>>()
 	{
-	}.getType();
+	};
 
 	@Inject
 	private ServerSuggestions serverSuggestions;
@@ -92,7 +91,7 @@ public class PlanNotifier
 			try
 			{
 				String json = configManager.getConfiguration("flippr", SENT_KEYS_KEY);
-				saved = json == null || json.isEmpty() ? null : gson.fromJson(json, KEY_LIST);
+				saved = json == null || json.isEmpty() ? null : gson.fromJson(json, KEY_LIST.getType());
 			}
 			catch (RuntimeException e)
 			{

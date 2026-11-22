@@ -2,7 +2,6 @@ package com.flippr.osrs;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import java.lang.reflect.Type;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -98,9 +97,9 @@ public class PriceFeed
 		boolean members;
 	}
 
-	private static final Type MAPPING_LIST_TYPE = new TypeToken<List<MappingEntry>>()
+	private static final TypeToken<List<MappingEntry>> MAPPING_LIST_TYPE = new TypeToken<List<MappingEntry>>()
 	{
-	}.getType();
+	};
 
 	// One bucket from /timeseries - avgHighPrice/avgLowPrice are the same
 	// instant-buy/instant-sell semantics as PricePoint's high/low above,
@@ -260,7 +259,7 @@ public class PriceFeed
 				log.warn("Item mapping fetch returned status {}", r.code());
 				return;
 			}
-			List<MappingEntry> entries = gson.fromJson(body.string(), MAPPING_LIST_TYPE);
+			List<MappingEntry> entries = gson.fromJson(body.string(), MAPPING_LIST_TYPE.getType());
 			if (entries != null)
 			{
 				Map<Integer, Integer> limits = new HashMap<>();

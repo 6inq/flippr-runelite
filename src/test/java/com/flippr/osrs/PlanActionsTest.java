@@ -149,8 +149,7 @@ public class PlanActionsTest
 		assertFalse(defaults.notifyPartialFills());
 		assertTrue(defaults.notifyAutoPrice());
 		assertTrue(defaults.notifyNewFlip());
-		assertTrue("Shift fills the price / quantity box by default", defaults.quickFillEnabled());
-		assertEquals(net.runelite.client.config.Keybind.SHIFT, defaults.quickSetKeybind());
+		assertTrue("the price / quantity hint line is on by default", defaults.geFillLine());
 		assertFalse("sell-only is off by default", defaults.sellOnlyMode());
 	}
 

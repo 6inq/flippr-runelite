@@ -3,9 +3,6 @@ package com.flippr.osrs;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import javax.inject.Inject;
@@ -34,10 +31,10 @@ import net.runelite.client.game.ItemManager;
 @Singleton
 public class NewItemDetector
 {
-	private static final Path KNOWN_ITEMS_FILE = FlipprFiles.KNOWN_ITEMS;
-	private static final Type ID_SET_TYPE = new TypeToken<Set<Integer>>()
+	private static final String KNOWN_ITEMS_FILE = FlipprFiles.KNOWN_ITEMS;
+	private static final TypeToken<Set<Integer>> ID_SET_TYPE = new TypeToken<Set<Integer>>()
 	{
-	}.getType();
+	};
 	// Re-checking every PriceFeed poll (10s) would just repeat the same diff
 	// against data that hasn't meaningfully changed - this only needs to run
 	// occasionally.
@@ -45,6 +42,9 @@ public class NewItemDetector
 
 	@Inject
 	private PriceFeed priceFeed;
+
+	@Inject
+	private FlipprFiles files;
 
 	@Inject
 	private ItemManager itemManager;
@@ -159,10 +159,10 @@ public class NewItemDetector
 	{
 		try
 		{
-			if (Files.exists(KNOWN_ITEMS_FILE))
+			String json = files.readString(KNOWN_ITEMS_FILE);
+			if (json != null)
 			{
-				String json = Files.readString(KNOWN_ITEMS_FILE);
-				Set<Integer> loaded = gson.fromJson(json, ID_SET_TYPE);
+				Set<Integer> loaded = gson.fromJson(json, ID_SET_TYPE.getType());
 				if (loaded != null)
 				{
 					return new HashSet<>(loaded);
@@ -180,8 +180,7 @@ public class NewItemDetector
 	{
 		try
 		{
-			Files.createDirectories(KNOWN_ITEMS_FILE.getParent());
-			Files.writeString(KNOWN_ITEMS_FILE, gson.toJson(ids));
+			files.writeString(KNOWN_ITEMS_FILE, gson.toJson(ids));
 		}
 		catch (IOException e)
 		{

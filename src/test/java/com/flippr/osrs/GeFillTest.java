@@ -1,22 +1,15 @@
 package com.flippr.osrs;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
-import javax.swing.JPanel;
-import net.runelite.client.config.Keybind;
 import org.junit.Test;
 
-// Requirement: filling the GE price / quantity prompt - the prompt is
-// recognised for both number modes (quantity 32-bit, price 64-bit), the
-// value is the suggestion's for that item and side, the chatbox line reads
-// "Flippr price: 1,234 gp" / "Flippr quantity: 500", the fill key never is
-// Enter or an unset key, and the GE search preset only ever touches rows
-// carrying Flippr's own marker.
+// Requirement: the GE price / quantity hint - the prompt is recognised for
+// both number modes (quantity 32-bit, price 64-bit), the value is the
+// suggestion's for that item and side, the read-only chatbox line reads
+// "Flippr price: 1,234" / "Flippr quantity: 500", and the GE search preset
+// only ever touches rows carrying Flippr's own marker.
 public class GeFillTest
 {
 	private static final int WHIP = 4151;
@@ -52,42 +45,14 @@ public class GeFillTest
 		assertNull("no box", GeChatInput.valueFor(all, GeChatInput.Box.NONE, WHIP, false));
 	}
 
-	// Req: line text, exact gp; the key is named only when fill-on-keypress is on.
+	// Req: line text, exact value, no key or action named.
 	@Test
 	public void lineText()
 	{
-		assertEquals("Flippr price: 1,234 gp", GeChatInput.lineText(GeChatInput.Box.PRICE, 1_234, Keybind.SHIFT, false));
-		assertEquals("Flippr quantity: 500", GeChatInput.lineText(GeChatInput.Box.QUANTITY, 500, Keybind.SHIFT, false));
-		assertEquals("Flippr price: 2,147,483,648 gp", GeChatInput.lineText(GeChatInput.Box.PRICE, 2_147_483_648L, null, true));
-		assertTrue(GeChatInput.lineText(GeChatInput.Box.QUANTITY, 500, Keybind.SHIFT, true).startsWith("Flippr quantity: 500  (or press "));
-		assertEquals("Flippr quantity: 500", GeChatInput.lineText(GeChatInput.Box.QUANTITY, 500, Keybind.NOT_SET, true));
-	}
-
-	private static KeyEvent key(int code, int modifiers)
-	{
-		// A real key press carries its extended key code (what RuneLite's
-		// Keybind matches on); a constructed event leaves it 0, so report it.
-		return new KeyEvent(new JPanel(), KeyEvent.KEY_PRESSED, 0, modifiers, code, KeyEvent.CHAR_UNDEFINED)
-		{
-			@Override
-			public int getExtendedKeyCode()
-			{
-				return code;
-			}
-		};
-	}
-
-	// Req: keybind matching - the configured key fills; Enter never does; unset never does.
-	@Test
-	public void keybindMatching()
-	{
-		Keybind f5 = new Keybind(KeyEvent.VK_F5, 0);
-		assertTrue(QuickFillHandler.triggers(f5, key(KeyEvent.VK_F5, 0)));
-		assertFalse(QuickFillHandler.triggers(f5, key(KeyEvent.VK_F6, 0)));
-		assertTrue(QuickFillHandler.triggers(Keybind.SHIFT, key(KeyEvent.VK_SHIFT, InputEvent.SHIFT_DOWN_MASK)));
-		assertFalse("Enter is the submit key", QuickFillHandler.triggers(new Keybind(KeyEvent.VK_ENTER, 0), key(KeyEvent.VK_ENTER, 0)));
-		assertFalse(QuickFillHandler.triggers(Keybind.NOT_SET, key(KeyEvent.VK_F5, 0)));
-		assertFalse(QuickFillHandler.triggers(null, key(KeyEvent.VK_F5, 0)));
+		assertEquals("Flippr price: 1,234", GeChatInput.lineText(GeChatInput.Box.PRICE, 1_234));
+		assertEquals("Flippr quantity: 500", GeChatInput.lineText(GeChatInput.Box.QUANTITY, 500));
+		assertEquals("Flippr price: 6,562,536", GeChatInput.lineText(GeChatInput.Box.PRICE, 6_562_536));
+		assertEquals("Flippr price: 2,147,483,648", GeChatInput.lineText(GeChatInput.Box.PRICE, 2_147_483_648L));
 	}
 
 	// Req: the search row shows only a suggested buy with an item - never

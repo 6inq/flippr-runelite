@@ -61,21 +61,21 @@ public class SuggestionTextTest
 		assertSame(modify, SuggestionOverlay.pickOneToHighlight(all));
 	}
 
-	// Req: fills from whatever suggestion matches the open item and side -
-	// not only DUMP_BUY - and never from a different item.
+	// Req: the hint comes from whatever suggestion matches the open item and
+	// side - not only DUMP_BUY - and never from a different item.
 	@Test
-	public void quickFillPicksTheMatchingSuggestion()
+	public void hintPicksTheMatchingSuggestion()
 	{
 		DecisionEngine.Suggestion[] all = new DecisionEngine.Suggestion[8];
 		all[0] = withValues(SuggestionType.START_NEW_FLIP, 0, BOND, "Old school bond", 10_592_523L, 97L, false);
 		all[1] = withValues(SuggestionType.SELL, 1, WHIP, "Abyssal whip", 1_620_000L, 3L, true);
 		all[2] = withValues(SuggestionType.MODIFY, 2, WHIP, "Abyssal whip", null, null, false);
 
-		assertSame(all[0], QuickFillHandler.findSuggestion(all, BOND, false, true));
-		assertSame(all[0], QuickFillHandler.findSuggestion(all, BOND, false, false));
-		assertSame(all[1], QuickFillHandler.findSuggestion(all, WHIP, true, true));
-		assertNull("buy box for the whip: only a MODIFY without a price", QuickFillHandler.findSuggestion(all, WHIP, false, false));
-		assertNull("sell box for the bond: wrong side", QuickFillHandler.findSuggestion(all, BOND, true, true));
-		assertNull("unrelated item", QuickFillHandler.findSuggestion(all, 995, false, true));
+		assertSame(all[0], GeChatInput.findSuggestion(all, BOND, false, true));
+		assertSame(all[0], GeChatInput.findSuggestion(all, BOND, false, false));
+		assertSame(all[1], GeChatInput.findSuggestion(all, WHIP, true, true));
+		assertNull("buy box for the whip: only a MODIFY without a price", GeChatInput.findSuggestion(all, WHIP, false, false));
+		assertNull("sell box for the bond: wrong side", GeChatInput.findSuggestion(all, BOND, true, true));
+		assertNull("unrelated item", GeChatInput.findSuggestion(all, 995, false, true));
 	}
 }

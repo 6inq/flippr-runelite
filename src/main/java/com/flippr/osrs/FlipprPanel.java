@@ -18,7 +18,6 @@ import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -38,6 +37,7 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.QuantityFormatter;
 
@@ -267,7 +267,6 @@ public class FlipprPanel extends PluginPanel
 	private final JToggleButton[] tabButtons = new JToggleButton[TABS.length];
 	private final JPanel tabContent = new JPanel();
 	private final JLabel headerStatusLabel = new JLabel();
-	private final JLabel premiumNoticeLabel = new JLabel();
 	// Plan tab banner: what is switching the GE guidance off (GuidanceGate).
 	private final JPanel guidanceBanner = new JPanel(new BorderLayout(0, 4));
 	private final JLabel guidanceBannerLabel = new JLabel();
@@ -286,9 +285,6 @@ public class FlipprPanel extends PluginPanel
 	private void buildTabs()
 	{
 		JPanel plan = tabColumn();
-		premiumNoticeLabel.setFont(FontManager.getRunescapeSmallFont());
-		premiumNoticeLabel.setAlignmentX(LEFT_ALIGNMENT);
-		premiumNoticeLabel.setBorder(new EmptyBorder(0, 2, 6, 2));
 		sellOnlyHeader.setFont(FontManager.getRunescapeSmallFont());
 		sellOnlyHeader.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		sellOnlyHeader.setAlignmentX(LEFT_ALIGNMENT);
@@ -314,7 +310,6 @@ public class FlipprPanel extends PluginPanel
 		});
 		plan.add(buildGuidanceBanner());
 		plan.add(sellOnlyHeader);
-		plan.add(premiumNoticeLabel);
 		plan.add(planSetupView);
 		plan.add(Box.createVerticalStrut(6));
 		plan.add(planBoardView);
@@ -650,16 +645,22 @@ public class FlipprPanel extends PluginPanel
 			return;
 		}
 
-		JFileChooser chooser = new JFileChooser();
-		chooser.setSelectedFile(new java.io.File(rsn + "-flippr-export.json"));
-		if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION)
+		List<Filepath> chosen = new Filepath.Chooser()
+			.setIsSave()
+			.setAcceptsFiles()
+			.setDialogTitle("Export Flippr data")
+			.addExtensionFilter("JSON files", "json")
+			.setDefaultExtension("json")
+			.setFileName(rsn + "-flippr-export.json")
+			.showDialog(this);
+		if (chosen == null || chosen.isEmpty())
 		{
 			return;
 		}
 
 		try
 		{
-			portfolioExporter.export(rsn, chooser.getSelectedFile().toPath());
+			portfolioExporter.export(rsn, chosen.get(0));
 			JOptionPane.showMessageDialog(this, "Exported " + rsn + "'s portfolio, trades, and sessions.", "Flippr", JOptionPane.INFORMATION_MESSAGE);
 		}
 		catch (java.io.IOException ex)
@@ -671,15 +672,20 @@ public class FlipprPanel extends PluginPanel
 
 	private void importIntoSelectedAccount()
 	{
-		JFileChooser chooser = new JFileChooser();
-		if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION)
+		List<Filepath> chosen = new Filepath.Chooser()
+			.setIsOpen()
+			.setAcceptsFiles()
+			.setDialogTitle("Import Flippr data")
+			.addExtensionFilter("JSON files", "json")
+			.showDialog(this);
+		if (chosen == null || chosen.isEmpty())
 		{
 			return;
 		}
 
 		try
 		{
-			PortfolioExporter.ImportResult result = portfolioExporter.importFrom(chooser.getSelectedFile().toPath());
+			PortfolioExporter.ImportResult result = portfolioExporter.importFrom(chosen.get(0));
 			refreshAccountDropdownOptions();
 			String message = String.format(
 				"Imported %s: %d new flip(s), %d new session(s), %d position(s) restored.",
@@ -1164,8 +1170,6 @@ public class FlipprPanel extends PluginPanel
 		else
 		{
 			WebsiteConnection.Status status = websiteConnection.getLastStatus();
-			JButton verifyButton = new JButton("Verify Premium");
-			verifyButton.addActionListener(e -> runWebsiteAction(verifyButton, websiteConnection::verifyPremium));
 
 			String character = websiteConnection.getCharacter();
 			String characterError = websiteConnection.getCharacterError();
@@ -1202,31 +1206,6 @@ public class FlipprPanel extends PluginPanel
 				JLabel discordLabel = dimLabel("Discord: " + (status.discordLinked ? status.discordUsername : "not linked"));
 				discordLabel.setForeground(status.discordLinked ? config.profitColor() : ColorScheme.LIGHT_GRAY_COLOR);
 				websiteContainer.add(discordLabel);
-
-				boolean seat = status.seat != null && status.seat.assigned;
-				JLabel premiumLabel = new JLabel(status.premium
-					? "Premium: yes" + (seat ? " (seat assigned)" : status.allCharactersIncluded ? " (all characters)" : "")
-					: "Premium: no - free suggestions are F2P items");
-				premiumLabel.setForeground(status.premium ? config.profitColor() : ColorScheme.LIGHT_GRAY_COLOR);
-				premiumLabel.setFont(FontManager.getRunescapeSmallFont());
-				websiteContainer.add(premiumLabel);
-				// The website's in-game name check (PremiumVerification).
-				PremiumVerification.Line verification = PremiumVerification.statusLine(status, character);
-				if (verification != null)
-				{
-					JLabel verificationLabel = wrappedLabel(verification.text);
-					verificationLabel.setForeground(verification.tone == PremiumVerification.Tone.GOOD ? config.profitColor()
-						: verification.tone == PremiumVerification.Tone.BAD ? config.lossColor() : ColorScheme.LIGHT_GRAY_COLOR);
-					websiteContainer.add(verificationLabel);
-				}
-				if (status.premiumGames != null && !status.premiumGames.isEmpty())
-				{
-					websiteContainer.add(dimLabel("Premium games: " + String.join(", ", status.premiumGames)));
-				}
-				if (!status.premium)
-				{
-					websiteContainer.add(dimLabel("Upgrade at " + websiteConnection.baseUrl() + "/subscriptions"));
-				}
 			}
 
 			for (JLabel label : new JLabel[]{liveSyncLabel, uploadsLabel, suggestionsStatusLabel})
@@ -1250,9 +1229,8 @@ public class FlipprPanel extends PluginPanel
 			uploadHistoryButton.setEnabled(config.syncWithWebsite());
 			uploadHistoryButton.addActionListener(e -> uploadHistory(uploadHistoryButton));
 
-			JPanel buttons = new JPanel(new GridLayout(1, 2, 4, 0));
+			JPanel buttons = new JPanel(new GridLayout(1, 1, 4, 0));
 			buttons.setBackground(CARD_COLOR);
-			buttons.add(verifyButton);
 			buttons.add(uploadHistoryButton);
 			websiteContainer.add(buttons);
 		}
@@ -1269,7 +1247,7 @@ public class FlipprPanel extends PluginPanel
 		return websiteConnection.isConfigured() + ":" + websiteConnection.isPaired() + ":"
 			+ websiteConnection.isAuthRejected() + ":" + config.syncWithWebsite() + ":"
 			+ websiteConnection.getCharacter() + ":" + websiteConnection.getCharacterError() + ":"
-			+ (status == null ? "-" : status.characterName + "/" + status.premium + "/" + status.discordUsername + "/" + status.premiumState);
+			+ (status == null ? "-" : status.characterName + "/" + status.discordUsername);
 	}
 
 	private void updateWebsiteStatus()
@@ -1288,9 +1266,7 @@ public class FlipprPanel extends PluginPanel
 		}
 	}
 
-	// The line under the title, and the Plan tab's Premium note: P2P items
-	// need Premium for this character, but nothing else is blocked - F2P
-	// flips, the Plan, Tracker, History and Prices keep working.
+	// The line under the title: website, pairing and sync state.
 	private void updateHeaderStatus()
 	{
 		String header;
@@ -1323,23 +1299,10 @@ public class FlipprPanel extends PluginPanel
 			header = "Synced - " + websiteConnection.getCharacter();
 		}
 		headerStatusLabel.setText(header);
-
-		String premiumBlocked = websiteConnection.getPremiumBlockedMessage();
-		String notice = null;
-		if (serverSuggestions.isGated())
-		{
-			notice = premiumBlocked != null
-				? "P2P items are paused: " + premiumBlocked + " F2P flips keep working."
-				: "Free plan: Flippr suggests F2P items for this character. P2P items need Premium ("
-					+ websiteConnection.baseUrl() + "/subscriptions) - everything else works.";
-		}
-		premiumNoticeLabel.setVisible(notice != null);
-		premiumNoticeLabel.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		premiumNoticeLabel.setText(notice == null ? "" : "<html><body style='width:180px'>" + escapeHtml(notice) + "</body></html>");
 	}
 
 	// "Live sync: on - last sent 3s ago", "Uploads queued: 0", and the
-	// maintenance/offline/Premium notes - refreshed every panel tick.
+	// maintenance/offline notes - refreshed every panel tick.
 	private void updateWebsiteStatusLabels()
 	{
 		long now = System.currentTimeMillis();
@@ -1372,19 +1335,7 @@ public class FlipprPanel extends PluginPanel
 		uploadsLabel.setText("Uploads queued: " + Math.max(0, tradeUploader.getQueuedCount())
 			+ (uploadRetry > 0 ? " (retrying in " + formatAgo(uploadRetry) + ")" : ""));
 
-		String premiumBlocked = websiteConnection.getPremiumBlockedMessage();
-		if (serverSuggestions.isGated() && premiumBlocked != null)
-		{
-			// Seat is there, the in-game name check isn't: F2P suggestions
-			// keep coming, say why P2P ones don't.
-			suggestionsStatusLabel.setText("<html>Free suggestions only: " + escapeHtml(premiumBlocked) + "</html>");
-		}
-		else if (serverSuggestions.isGated())
-		{
-			suggestionsStatusLabel.setText("<html>P2P suggestions need Premium for this character - "
-				+ escapeHtml(websiteConnection.baseUrl()) + "/subscriptions</html>");
-		}
-		else if (serverSuggestions.isFailing() && serverSuggestions.getRetryRemainingMs() > 0)
+		if (serverSuggestions.isFailing() && serverSuggestions.getRetryRemainingMs() > 0)
 		{
 			suggestionsStatusLabel.setText("Suggestions offline - retrying in "
 				+ formatAgo(serverSuggestions.getRetryRemainingMs()));

@@ -37,8 +37,7 @@ tasks.withType(JavaCompile).configureEach {
 
 // `gradlew run` boots the actual RuneLite client in developer mode with this
 // plugin already loaded (via ExternalPluginManager.loadBuiltin in
-// FlipprPluginTest) - the real, official way to locally test against a live
-// OSRS session, same pattern as runelite/example-plugin.
+// FlipprPluginTest), for testing locally against a live OSRS session.
 tasks.register('run', JavaExec) {
 	classpath = sourceSets.test.runtimeClasspath
 	mainClass = pluginMainClass

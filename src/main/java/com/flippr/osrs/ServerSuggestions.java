@@ -34,9 +34,9 @@ import net.runelite.api.GameState;
 //   with the gp the next flip may use: the original share, plus the slot's
 //   profit when the plan reinvests), /flips is fetched too and those slots
 //   get server candidates sized to that gp until the plan replaces them.
-// - otherwise GET /api/v1/osrs/flips: ranked candidates. Free accounts get
-//   F2P items only (the server gates them and says gated: true).
-// The plugin never decides what is Premium - it shows what the server sends.
+// - otherwise GET /api/v1/osrs/flips: ranked candidates.
+// The plugin shows what the server sends; any other fields on a reply are
+// ignored.
 //
 // 401 pauses everything until re-paired, a maintenance 503 pauses every
 // website call (WebsiteConnection.handle), and network errors back off from
@@ -82,11 +82,7 @@ public class ServerSuggestions
 
 	static class FlipsResponse
 	{
-		boolean gated;
 		List<Candidate> flips;
-		// Set when this character has a seat but the website's in-game
-		// name check is why P2P items were left out.
-		WebsiteConnection.PremiumBlocked premiumBlocked;
 	}
 
 	// One open plan position (as
@@ -185,15 +181,13 @@ public class ServerSuggestions
 		final List<FreeSlot> planFreeSlots;
 		// Server candidates: without a plan, or for a plan's free slots.
 		final List<Candidate> candidates;
-		final boolean gated;
 		final long fetchedAt;
 
-		Data(List<PlanPosition> planPositions, List<FreeSlot> planFreeSlots, List<Candidate> candidates, boolean gated, long fetchedAt)
+		Data(List<PlanPosition> planPositions, List<FreeSlot> planFreeSlots, List<Candidate> candidates, long fetchedAt)
 		{
 			this.planPositions = planPositions;
 			this.planFreeSlots = planFreeSlots;
 			this.candidates = candidates;
-			this.gated = gated;
 			this.fetchedAt = fetchedAt;
 		}
 
@@ -249,8 +243,6 @@ public class ServerSuggestions
 	LongSupplier clock = System::currentTimeMillis;
 
 	private volatile Data data;
-	// Sticky across plan/no-plan fetches: the panel's Premium hint.
-	private volatile boolean gated;
 	private final Backoff backoff = new Backoff(30_000, 600_000);
 	private long nextFetchAt;
 	private long lastFetchStartedAt;
@@ -266,11 +258,6 @@ public class ServerSuggestions
 			return null;
 		}
 		return clock.getAsLong() - d.fetchedAt <= MAX_DATA_AGE_MS ? d : null;
-	}
-
-	public boolean isGated()
-	{
-		return gated && website.isSyncEnabled();
 	}
 
 	public synchronized long getRetryRemainingMs()
@@ -360,7 +347,7 @@ public class ServerSuggestions
 			}
 			synchronized (this)
 			{
-				data = new Data(positions, freeSlots, Collections.emptyList(), false, clock.getAsLong());
+				data = new Data(positions, freeSlots, Collections.emptyList(), clock.getAsLong());
 				data.planInfo = info;
 				backoff.reset();
 				inFlight = false;
@@ -403,11 +390,9 @@ public class ServerSuggestions
 			return;
 		}
 		List<Candidate> candidates = flips == null || flips.flips == null ? Collections.emptyList() : flips.flips;
-		website.notePremiumBlocked(flips == null ? null : flips.premiumBlocked);
 		synchronized (this)
 		{
-			gated = flips != null && flips.gated;
-			data = new Data(planPositions, freeSlots, candidates, gated, clock.getAsLong());
+			data = new Data(planPositions, freeSlots, candidates, clock.getAsLong());
 			data.planInfo = planInfo;
 			backoff.reset();
 			inFlight = false;

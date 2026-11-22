@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
+import net.runelite.client.util.Filepath;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -35,7 +36,7 @@ import org.mockito.Spy;
 // most 200 in the CompletedFlip JSON the site's /trades route maps, removes
 // only lines that were sent successfully, skips malformed lines, and
 // "Upload history" queues only the given character's past flips. A temp
-// folder stands in for the real data folders; the executor runs tasks inline.
+// folder stands in for the plugin's data folder; the executor runs tasks inline.
 public class TradeUploaderTest
 {
 	@Rule
@@ -52,6 +53,9 @@ public class TradeUploaderTest
 	private TradeUploader uploader;
 
 	private AutoCloseable mocks;
+	private FlipprFiles files;
+	private Path queueFile;
+	private Path flipsFile;
 	private long now = 1_700_000_000_000L;
 	private final List<String> posted = new ArrayList<>();
 	// Outcome for each successive POST; OK once the list runs out.
@@ -62,8 +66,11 @@ public class TradeUploaderTest
 	{
 		mocks = MockitoAnnotations.openMocks(this);
 		uploader.clock = () -> now;
-		uploader.queueFile = folder.getRoot().toPath().resolve("upload-queue.jsonl");
-		uploader.flipsFile = folder.getRoot().toPath().resolve("flips.jsonl");
+		files = new FlipprFiles();
+		files.setRoot(Filepath.Unchecked.getRooted(folder.getRoot().toPath()));
+		uploader.files = files;
+		queueFile = folder.getRoot().toPath().resolve(FlipprFiles.UPLOAD_QUEUE);
+		flipsFile = folder.getRoot().toPath().resolve(FlipprFiles.FLIPS);
 		when(website.isSyncEnabled()).thenReturn(true);
 		when(website.isInMaintenance()).thenReturn(false);
 		doAnswer(inv ->
@@ -114,13 +121,13 @@ public class TradeUploaderTest
 		{
 			lines.add(gson.toJson(flip(now - i, 4151, "Alice")));
 		}
-		Files.write(uploader.queueFile, lines, StandardCharsets.UTF_8);
+		Files.write(queueFile, lines, StandardCharsets.UTF_8);
 		uploader.init();
 	}
 
 	private List<String> queueLines() throws IOException
 	{
-		return Files.exists(uploader.queueFile) ? Files.readAllLines(uploader.queueFile, StandardCharsets.UTF_8) : new ArrayList<>();
+		return Files.exists(queueFile) ? Files.readAllLines(queueFile, StandardCharsets.UTF_8) : new ArrayList<>();
 	}
 
 	private JsonArray body(int index)
@@ -146,7 +153,7 @@ public class TradeUploaderTest
 		}
 
 		TradeUploader restarted = new TradeUploader();
-		restarted.queueFile = uploader.queueFile;
+		restarted.files = files;
 		assertEquals(1, restarted.readLines().size());
 	}
 
@@ -207,7 +214,7 @@ public class TradeUploaderTest
 	public void malformedLinesAreSkipped() throws IOException
 	{
 		String good = gson.toJson(flip(now, 4151, "Alice"));
-		Files.write(uploader.queueFile, Arrays.asList("{not json", good, "", "42", "[1,2]"), StandardCharsets.UTF_8);
+		Files.write(queueFile, Arrays.asList("{not json", good, "", "42", "[1,2]"), StandardCharsets.UTF_8);
 		uploader.init();
 
 		uploader.onGameTick();
@@ -234,7 +241,7 @@ public class TradeUploaderTest
 	@Test
 	public void historyQueuesOnlyThisCharacter() throws IOException
 	{
-		Files.write(uploader.flipsFile, Arrays.asList(
+		Files.write(flipsFile, Arrays.asList(
 			gson.toJson(flip(now - 3, 1, "Alice")),
 			gson.toJson(flip(now - 2, 2, "Bob")),
 			gson.toJson(flip(now - 1, 3, null)),

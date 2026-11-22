@@ -3,7 +3,6 @@ package com.flippr.osrs;
 import com.google.gson.Gson;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import javax.inject.Inject;
@@ -21,10 +20,9 @@ import okhttp3.ResponseBody;
 
 // Talks to the real Flippr website's plugin-pairing API: pair a code typed in
 // from the website's /account page for a real, permanent API key, then use
-// that key to check Premium status on demand. pair()/verifyPremium() are
-// synchronous - callers (FlipprPanel) run them off the Swing EDT via a
-// background thread, since these are user-initiated button clicks, not a
-// polling loop.
+// that key for the account status (refreshStatusAsync). pair() is
+// synchronous - FlipprPanel runs it off the Swing EDT via a background
+// thread, since it is a user-initiated button click, not a polling loop.
 //
 // Also the shared front door for the background website features
 // (ServerSuggestions, OfferSync, TradeUploader): getAsync()/postJsonAsync()
@@ -32,9 +30,9 @@ import okhttp3.ResponseBody;
 // response goes through handle() so a 401 (key revoked) or a 503
 // maintenance answer pauses all of them the same way.
 //
-// Premium is pinned per character by the website - it resolves that from
-// which account this specific API key was paired to, so the plugin doesn't
-// need to know or reason about the player's other accounts at all.
+// The website resolves the character from which account this specific API
+// key was paired to, so the plugin doesn't need to know or reason about the
+// player's other accounts at all.
 // @Singleton - see DecisionEngine's class comment for why every stateful
 // tracker in this plugin gets this regardless of current injection-site
 // count.
@@ -46,59 +44,16 @@ public class WebsiteConnection
 	{
 		String characterName;
 		String game;
-		boolean premium;
-		String subscriptionStatus;
-		// Proof of the whole chain, not just a bare premium boolean - which
-		// real Flippr account this key resolves to, and whether that account
-		// has Discord linked at all (discordUsername is null if not).
+		// Which real Flippr account this key resolves to, and whether that
+		// account has Discord linked at all (discordUsername is null if not).
+		// Any other fields the server sends are ignored.
 		String email;
 		boolean discordLinked;
 		String discordUsername;
-		// Premium seat for THIS character, and every game the account has
-		// Premium for (display only - all gating happens on the server).
-		Seat seat;
-		boolean allCharactersIncluded;
-		List<String> premiumGames;
 		// Account keys: "account" (one pairing for every character, both
 		// games) or "character" (legacy key for one character).
 		String scope;
 		MaintenanceBody characterError;
-		// The website's in-game name check for this character:
-		// "verified" | "grace" | "unverified" |
-		// "mismatch" | "no_seat". premium already includes it.
-		String premiumState;
-		boolean verified;
-		boolean locked;
-		String graceUntil;
-		String lastObservedName;
-		String premiumMessage;
-		// Account keys: every character on the Flippr account.
-		List<CharacterInfo> characters;
-	}
-
-	static class CharacterInfo
-	{
-		String game;
-		String name;
-		boolean premium;
-		boolean seatAssigned;
-		String premiumState;
-	}
-
-	// A premium_unverified refusal: a 403 body, or premiumBlocked on a
-	// flips/plan reply.
-	static class PremiumBlocked
-	{
-		String error;
-		String message;
-		String expected;
-		String observed;
-		String premiumState;
-	}
-
-	static class Seat
-	{
-		boolean assigned;
 	}
 
 	static class Result<T>
@@ -192,9 +147,6 @@ public class WebsiteConnection
 	// calls wait until it's known.
 	private volatile String characterName;
 	private volatile String characterError;
-	// The last premium_unverified message from the website (a 403 or
-	// premiumBlocked on a reply); free features keep working regardless.
-	private volatile String premiumBlockedMessage;
 
 	LongSupplier clock = System::currentTimeMillis;
 
@@ -256,7 +208,6 @@ public class WebsiteConnection
 		{
 			characterError = null;
 			lastStatus = null;
-			premiumBlockedMessage = null;
 		}
 		characterName = clean;
 		return true;
@@ -271,19 +222,6 @@ public class WebsiteConnection
 	public String getCharacterError()
 	{
 		return characterError;
-	}
-
-	// Why Premium is off for this character because of the in-game name
-	// check, or null.
-	public String getPremiumBlockedMessage()
-	{
-		return premiumBlockedMessage;
-	}
-
-	// From a reply's premiumBlocked field (null clears it).
-	void notePremiumBlocked(PremiumBlocked blocked)
-	{
-		premiumBlockedMessage = PremiumVerification.blockedMessage(blocked);
 	}
 
 	public boolean isInMaintenance()
@@ -427,19 +365,6 @@ public class WebsiteConnection
 			log.warn("Website: character {} rejected (409 {})", name, conflict == null ? "?" : conflict.error);
 			return new ApiResponse(Outcome.CONFLICT, code, body);
 		}
-		if (code == 403)
-		{
-			// Premium content refused by the name check: say why, and let
-			// the caller carry on with free features (a plain failure).
-			PremiumBlocked blocked = parseQuietly(body, PremiumBlocked.class);
-			String message = PremiumVerification.blockedMessage(blocked);
-			if (message != null)
-			{
-				premiumBlockedMessage = message;
-				log.info("Website: Premium not applied - {}", message);
-			}
-			return new ApiResponse(Outcome.FAILED, code, body);
-		}
 		if (code == 503)
 		{
 			MaintenanceBody maintenance = parseQuietly(body, MaintenanceBody.class);
@@ -505,10 +430,6 @@ public class WebsiteConnection
 				if (status != null)
 				{
 					lastStatus = status;
-					if ("verified".equals(status.premiumState) || "grace".equals(status.premiumState))
-					{
-						premiumBlockedMessage = null;
-					}
 					if (status.characterError != null)
 					{
 						handle(409, null, gson.toJson(status.characterError));
@@ -584,79 +505,6 @@ public class WebsiteConnection
 		catch (Exception e)
 		{
 			log.warn("Website: pairing request failed - {}", e.toString());
-			return Result.error("Couldn't reach the website - check the URL in settings.");
-		}
-	}
-
-	// Synchronous - call from a background thread, not the EDT.
-	public Result<Status> verifyPremium()
-	{
-		if (!isPaired())
-		{
-			return Result.error("Not connected yet - pair with a code from your Account page first.");
-		}
-		if (!isConfigured())
-		{
-			return Result.error("Set the Flippr website URL in the plugin settings first.");
-		}
-		if (characterName == null)
-		{
-			return Result.error("Log in to a character first - Flippr checks the character you're playing.");
-		}
-
-		String url = baseUrl() + STATUS_PATH;
-		log.info("Website: status request -> {}", url);
-
-		try
-		{
-			Request request = authorized(STATUS_PATH).get().build();
-
-			String responseBody;
-			int code;
-			String retryAfter;
-			try (Response response = client().newCall(request).execute(); ResponseBody body = response.body())
-			{
-				code = response.code();
-				retryAfter = response.header("Retry-After");
-				responseBody = body.string();
-			}
-			ApiResponse handled = handle(code, retryAfter, responseBody);
-			if (handled.outcome == Outcome.MAINTENANCE)
-			{
-				return Result.error("Flippr is under maintenance - try again in a few minutes.");
-			}
-			if (handled.outcome == Outcome.UNAUTHORIZED)
-			{
-				return Result.error("This plugin key is no longer valid - pair again with a new code.");
-			}
-			if (code != 200)
-			{
-				String message = extractError(responseBody);
-				log.warn("Website: status check failed - HTTP {} {}", code, responseBody);
-				return Result.error(message != null ? message : "Status check failed (" + code + ")");
-			}
-
-			Status status = gson.fromJson(responseBody, Status.class);
-			lastStatus = status;
-			if (status.characterError != null)
-			{
-				handle(409, null, gson.toJson(status.characterError));
-				return Result.error(characterError);
-			}
-			characterError = null;
-			// The actual chain proof, logged plainly: character -> Flippr
-			// account -> Discord link -> resolved Premium status.
-			log.info(
-				"Website: verified {} ({}) -> {} -> discord={} -> premium={} ({})",
-				status.characterName, status.game, status.email,
-				status.discordLinked ? status.discordUsername : "not linked",
-				status.premium, status.subscriptionStatus
-			);
-			return Result.ok(status);
-		}
-		catch (Exception e)
-		{
-			log.warn("Website: status check request failed - {}", e.toString());
 			return Result.error("Couldn't reach the website - check the URL in settings.");
 		}
 	}

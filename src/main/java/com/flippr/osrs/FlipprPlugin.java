@@ -2,6 +2,7 @@ package com.flippr.osrs;
 
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -29,6 +30,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 
 // Reads and logs live GE offer state, tracks completed buy-then-sell cycles
@@ -42,6 +44,8 @@ import net.runelite.client.util.ImageUtil;
 @Slf4j
 @PluginDescriptor(
 	name = "Flippr",
+	internalName = "flippr",
+	legacyDataDirectory = "flippr",
 	description = "Grand Exchange flipping tool with optional Flippr account sync",
 	tags = {"flipping", "grand exchange", "ge", "merching", "profit"}
 )
@@ -62,6 +66,9 @@ public class FlipprPlugin extends Plugin
 
 	@Inject
 	private ItemManager itemManager;
+
+	@Inject
+	private FlipprFiles files;
 
 	@Inject
 	private FlipTracker flipTracker;
@@ -94,7 +101,7 @@ public class FlipprPlugin extends Plugin
 	private GeGuideNpcOverlay geGuideNpcOverlay;
 
 	@Inject
-	private ChatboxFillLine chatboxFillLine;
+	private ChatboxHintLine chatboxHintLine;
 
 	@Inject
 	private SellOnlyControl sellOnlyControl;
@@ -119,9 +126,6 @@ public class FlipprPlugin extends Plugin
 
 	@Inject
 	private NewItemDetector newItemDetector;
-
-	@Inject
-	private QuickFillHandler quickFillHandler;
 
 	@Inject
 	private SearchSuggestionInjector searchSuggestionInjector;
@@ -172,9 +176,9 @@ public class FlipprPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		// Before anything reads its files: bring over data from the old
-		// ~/.flippr-osrs folder (copies only, never overwrites).
-		FlipprFiles.migrateLegacyFiles();
+		// Before anything reads its files. Without the folder the plugin
+		// still runs, just without its local records.
+		openDataFolder();
 
 		boolean added = overlayManager.add(suggestionOverlay);
 		log.info("SuggestionOverlay added to OverlayManager: {}", added);
@@ -197,7 +201,6 @@ public class FlipprPlugin extends Plugin
 			.panel(flipprPanel)
 			.build();
 		clientToolbar.addNavigation(navigationButton);
-		quickFillHandler.register();
 		tradeUploader.init();
 		websiteConnection.refreshStatusAsync();
 		// Turned on while already logged in: no LOGGED_IN event will come,
@@ -210,6 +213,21 @@ public class FlipprPlugin extends Plugin
 		}
 
 		log.info("Flippr started");
+	}
+
+	private void openDataFolder()
+	{
+		try
+		{
+			Filepath dir = getPluginDirectory();
+			dir.createDirectories();
+			files.setRoot(dir);
+		}
+		catch (IOException | RuntimeException e)
+		{
+			files.setRoot(null);
+			log.warn("Flippr: could not open the plugin's data folder; local records are off", e);
+		}
 	}
 
 	@Override
@@ -227,7 +245,6 @@ public class FlipprPlugin extends Plugin
 		overlayManager.remove(geGuideNpcOverlay);
 		overlayManager.remove(portfolioTooltipOverlay);
 		clientToolbar.removeNavigation(navigationButton);
-		quickFillHandler.unregister();
 		log.info("Flippr stopped");
 	}
 
@@ -317,7 +334,7 @@ public class FlipprPlugin extends Plugin
 		}
 		if (GeChatInput.isNumericMode(mode))
 		{
-			clientThread.invokeLater(chatboxFillLine::refresh);
+			clientThread.invokeLater(chatboxHintLine::refresh);
 		}
 	}
 
@@ -378,7 +395,7 @@ public class FlipprPlugin extends Plugin
 		dumpDetector.onGameTick();
 		newItemDetector.onGameTick();
 		guidanceGate.onGameTick();
-		chatboxFillLine.refresh();
+		chatboxHintLine.refresh();
 		sellOnlyControl.onGameTick();
 		cancelledOfferWatcher.onGameTick();
 		multiAccountAggregator.onGameTick();

@@ -2,8 +2,6 @@ package com.flippr.osrs;
 
 import com.google.gson.Gson;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -13,6 +11,7 @@ import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Player;
+import net.runelite.client.util.Filepath;
 
 // One character's full exportable state, scoped by rsn as requested -
 // portfolio (open positions), trade history, and session history - to a
@@ -31,8 +30,8 @@ import net.runelite.api.Player;
 @Singleton
 public class PortfolioExporter
 {
-	private static final Path FLIPS_FILE = FlipprFiles.FLIPS;
-	private static final Path SESSIONS_FILE = FlipprFiles.SESSIONS;
+	private static final String FLIPS_FILE = FlipprFiles.FLIPS;
+	private static final String SESSIONS_FILE = FlipprFiles.SESSIONS;
 
 	// A plain DTO rather than reusing OpenPositionEntry directly - that
 	// class's fields are final with no no-arg constructor, which forces
@@ -79,6 +78,9 @@ public class PortfolioExporter
 	@Inject
 	private Client client;
 
+	@Inject
+	private FlipprFiles files;
+
 	// RuneLite's shared Gson; exports are pretty-printed via a derived copy.
 	@Inject
 	private Gson gson;
@@ -98,8 +100,9 @@ public class PortfolioExporter
 	// that rsn) to destination as pretty-printed JSON - a one-off save
 	// file, not an append-only stream, so there's no reason to keep it
 	// JSONL-compact like flips.jsonl itself.
-	public void export(String rsn, Path destination) throws IOException
+	public void export(String rsn, Filepath destination) throws IOException
 	{
+		requireDataFolder();
 		ExportBundle bundle = new ExportBundle();
 		bundle.rsn = rsn;
 		bundle.exportedAt = System.currentTimeMillis();
@@ -121,12 +124,7 @@ public class PortfolioExporter
 		bundle.flips = readFiltered(FLIPS_FILE, CompletedFlip.class, flip -> rsn.equals(flip.rsn));
 		bundle.sessions = readFiltered(SESSIONS_FILE, SessionSummary.class, session -> rsn.equals(session.rsn));
 
-		Path parent = destination.toAbsolutePath().getParent();
-		if (parent != null)
-		{
-			Files.createDirectories(parent);
-		}
-		Files.writeString(destination, gson.newBuilder().setPrettyPrinting().create().toJson(bundle));
+		FlipprFiles.writeString(destination, gson.newBuilder().setPrettyPrinting().create().toJson(bundle));
 	}
 
 	// Merges an exported bundle back in. Flips/sessions are appended to the
@@ -139,10 +137,23 @@ public class PortfolioExporter
 	// rsn matches the CURRENTLY logged-in character - restoring another
 	// account's stock into this one's live tracker would silently corrupt
 	// real cost-basis math for whoever actually happens to be logged in.
-	public ImportResult importFrom(Path source) throws IOException
+	public ImportResult importFrom(Filepath source) throws IOException
 	{
-		String json = Files.readString(source);
-		ExportBundle bundle = gson.fromJson(json, ExportBundle.class);
+		requireDataFolder();
+		String json = FlipprFiles.readString(source);
+		if (json == null)
+		{
+			throw new IOException("File not found");
+		}
+		ExportBundle bundle;
+		try
+		{
+			bundle = gson.fromJson(json, ExportBundle.class);
+		}
+		catch (RuntimeException e)
+		{
+			throw new IOException("Not a valid Flippr export file", e);
+		}
 		if (bundle == null)
 		{
 			throw new IOException("Not a valid Flippr export file");
@@ -173,14 +184,18 @@ public class PortfolioExporter
 		return new ImportResult(bundle.rsn, flipsAdded, sessionsAdded, positionsRestored);
 	}
 
-	private <T> List<T> readFiltered(Path file, Class<T> type, java.util.function.Predicate<T> filter) throws IOException
+	private void requireDataFolder() throws IOException
+	{
+		if (!files.isAvailable())
+		{
+			throw new IOException("the plugin's data folder is unavailable");
+		}
+	}
+
+	private <T> List<T> readFiltered(String file, Class<T> type, java.util.function.Predicate<T> filter) throws IOException
 	{
 		List<T> results = new ArrayList<>();
-		if (!Files.exists(file))
-		{
-			return results;
-		}
-		for (String line : Files.readAllLines(file))
+		for (String line : files.readLines(file))
 		{
 			if (line.isBlank())
 			{
@@ -209,7 +224,7 @@ public class PortfolioExporter
 	// Reads the whole existing file to dedup - the same "personal-machine
 	// scale, not big data" assumption SessionStatsAggregator already makes
 	// scanning the same files on every dropdown change.
-	private <T> int appendMissing(Path file, Class<T> type, List<T> incomingRecords, BiPredicate<T, T> matchesKey) throws IOException
+	private <T> int appendMissing(String file, Class<T> type, List<T> incomingRecords, BiPredicate<T, T> matchesKey) throws IOException
 	{
 		if (incomingRecords == null || incomingRecords.isEmpty())
 		{
@@ -232,13 +247,12 @@ public class PortfolioExporter
 			return 0;
 		}
 
-		Files.createDirectories(file.getParent());
 		StringBuilder builder = new StringBuilder();
 		for (T record : toAppend)
 		{
 			builder.append(gson.toJson(record)).append(System.lineSeparator());
 		}
-		Files.writeString(file, builder.toString(), java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+		files.append(file, builder.toString());
 		return toAppend.size();
 	}
 }

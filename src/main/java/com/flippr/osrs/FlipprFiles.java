@@ -1,79 +1,152 @@
 package com.flippr.osrs;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.Writer;
+import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import javax.annotation.Nullable;
+import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.RuneLite;
+import net.runelite.client.util.Filepath;
 
-// Every local file this plugin reads or writes lives in one folder under
-// RuneLite's own directory (~/.runelite/flippr) - the single place every
-// logger/reader points at.
+// Every local file this plugin reads or writes lives in the plugin's own
+// data folder, handed over by FlipprPlugin.startUp() before anything reads
+// a file. Until then, or if the folder could not be opened, reads come back
+// empty and writes are skipped, so the rest of the plugin keeps working
+// without its file features.
 @Slf4j
-public final class FlipprFiles
+@Singleton
+public class FlipprFiles
 {
-	public static final Path DIR = RuneLite.RUNELITE_DIR.toPath().resolve("flippr");
+	public static final String FLIPS = "flips.jsonl";
+	public static final String DECISIONS = "decisions.jsonl";
+	public static final String INVENTORY = "inventory.jsonl";
+	public static final String SESSIONS = "sessions.jsonl";
+	public static final String KNOWN_ITEMS = "known-items.json";
+	public static final String UPLOAD_QUEUE = "upload-queue.jsonl";
 
-	public static final Path FLIPS = DIR.resolve("flips.jsonl");
-	public static final Path DECISIONS = DIR.resolve("decisions.jsonl");
-	public static final Path INVENTORY = DIR.resolve("inventory.jsonl");
-	public static final Path SESSIONS = DIR.resolve("sessions.jsonl");
-	public static final Path KNOWN_ITEMS = DIR.resolve("known-items.json");
-	public static final Path UPLOAD_QUEUE = DIR.resolve("upload-queue.jsonl");
+	private volatile Filepath root;
 
-	// Where older versions of the plugin kept the same files.
-	static final Path LEGACY_DIR = Paths.get(System.getProperty("user.home"), ".flippr-osrs");
-
-	private FlipprFiles()
+	public void setRoot(@Nullable Filepath root)
 	{
+		this.root = root;
 	}
 
-	// One-time move to the new folder: copies each file from the old
-	// ~/.flippr-osrs folder that doesn't exist here yet. Never deletes or
-	// overwrites anything, and never throws - an IO problem is logged and
-	// the plugin starts regardless.
-	public static void migrateLegacyFiles()
+	public boolean isAvailable()
 	{
-		migrate(LEGACY_DIR, DIR);
+		return root != null;
 	}
 
-	// Returns how many files were copied.
-	static int migrate(Path source, Path target)
+	// The named file inside the data folder, or null while no folder is set.
+	@Nullable
+	public Filepath get(String name)
 	{
-		if (!Files.isDirectory(source))
+		Filepath dir = root;
+		return dir == null ? null : dir.join(name);
+	}
+
+	public List<String> readLines(String name) throws IOException
+	{
+		return readLines(get(name));
+	}
+
+	// The whole file as text, or null when it doesn't exist.
+	@Nullable
+	public String readString(String name) throws IOException
+	{
+		return readString(get(name));
+	}
+
+	public void writeString(String name, String text) throws IOException
+	{
+		Filepath file = get(name);
+		if (file != null)
 		{
-			return 0;
+			writeString(file, text);
 		}
+	}
 
-		int copied = 0;
-		try (DirectoryStream<Path> files = Files.newDirectoryStream(source, Files::isRegularFile))
+	// Appends one line (plus the platform line separator).
+	public void appendLine(String name, String line) throws IOException
+	{
+		append(name, line + System.lineSeparator());
+	}
+
+	public void append(String name, String text) throws IOException
+	{
+		Filepath file = get(name);
+		if (file != null)
 		{
-			for (Path file : files)
+			append(file, text);
+		}
+	}
+
+	// Every line of file, or an empty list when file is null or missing.
+	public static List<String> readLines(@Nullable Filepath file) throws IOException
+	{
+		if (file == null || !file.exists())
+		{
+			return Collections.emptyList();
+		}
+		List<String> lines = new ArrayList<>();
+		try (BufferedReader reader = file.openBufferedReader())
+		{
+			String line;
+			while ((line = reader.readLine()) != null)
 			{
-				Path dest = target.resolve(file.getFileName().toString());
-				if (Files.exists(dest))
-				{
-					continue;
-				}
-				try
-				{
-					Files.createDirectories(target);
-					Files.copy(file, dest);
-					copied++;
-					log.info("Flippr: copied {} to {}", file, dest);
-				}
-				catch (IOException e)
-				{
-					log.warn("Flippr: could not copy {} to {}", file, dest, e);
-				}
+				lines.add(line);
 			}
 		}
-		catch (IOException | RuntimeException e)
+		return lines;
+	}
+
+	@Nullable
+	public static String readString(@Nullable Filepath file) throws IOException
+	{
+		if (file == null || !file.exists())
 		{
-			log.warn("Flippr: could not migrate files from {}", source, e);
+			return null;
 		}
-		return copied;
+		StringBuilder text = new StringBuilder();
+		try (BufferedReader reader = file.openBufferedReader())
+		{
+			char[] buffer = new char[8192];
+			int n;
+			while ((n = reader.read(buffer)) != -1)
+			{
+				text.append(buffer, 0, n);
+			}
+		}
+		return text.toString();
+	}
+
+	// Replaces file's contents, creating its folder if needed.
+	public static void writeString(Filepath file, String text) throws IOException
+	{
+		createParent(file);
+		file.write(text, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+	}
+
+	// Adds text to the end of file, creating the file and its folder if needed.
+	public static void append(Filepath file, String text) throws IOException
+	{
+		createParent(file);
+		try (Writer writer = file.openWriter(StandardOpenOption.CREATE, StandardOpenOption.APPEND))
+		{
+			writer.write(text);
+		}
+	}
+
+	// A file picked in a file dialog is its own root, so it has no parent to
+	// create; its folder already exists.
+	private static void createParent(Filepath file) throws IOException
+	{
+		if (!file.isRoot())
+		{
+			file.getParent().createDirectories();
+		}
 	}
 }

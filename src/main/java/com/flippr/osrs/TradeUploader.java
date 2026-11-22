@@ -5,12 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,10 +17,11 @@ import java.util.function.LongSupplier;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.client.util.Filepath;
 
 // Uploads this character's completed flips to the website's Tracker
 // (POST /api/v1/osrs/trades). Each flip FlipLogger writes is also appended,
-// as the same CompletedFlip JSON, to ~/.runelite/flippr/upload-queue.jsonl; a
+// as the same CompletedFlip JSON, to upload-queue.jsonl in the plugin's data folder; a
 // background flush (every FLUSH_INTERVAL_MS, and NEW_FLIP_DELAY_MS after a
 // new flip) sends up to BATCH_SIZE lines per request and removes them only
 // after a 2xx, rewriting the queue atomically (temp file + move). Anything
@@ -53,10 +50,10 @@ public class TradeUploader
 	@Inject
 	private ScheduledExecutorService executor;
 
+	@Inject
+	FlipprFiles files;
+
 	LongSupplier clock = System::currentTimeMillis;
-	// Overridable in tests.
-	Path queueFile = FlipprFiles.UPLOAD_QUEUE;
-	Path flipsFile = FlipprFiles.FLIPS;
 
 	private final Object fileLock = new Object();
 	private final Backoff backoff = new Backoff(30_000, 600_000);
@@ -93,14 +90,14 @@ public class TradeUploader
 	// off the client thread and the EDT. Returns how many were queued.
 	public int queueHistory(String rsn)
 	{
-		if (rsn == null || rsn.isEmpty() || !Files.exists(flipsFile))
+		if (rsn == null || rsn.isEmpty())
 		{
 			return 0;
 		}
 		List<String> matching = new ArrayList<>();
 		try
 		{
-			for (String line : Files.readAllLines(flipsFile, StandardCharsets.UTF_8))
+			for (String line : files.readLines(FlipprFiles.FLIPS))
 			{
 				JsonObject flip = parseObject(line);
 				if (flip != null && flip.has("rsn") && flip.get("rsn").isJsonPrimitive()
@@ -112,7 +109,7 @@ public class TradeUploader
 		}
 		catch (IOException e)
 		{
-			log.warn("TradeUploader: could not read {}", flipsFile, e);
+			log.warn("TradeUploader: could not read {}", FlipprFiles.FLIPS, e);
 			return 0;
 		}
 		appendLines(matching);
@@ -254,19 +251,17 @@ public class TradeUploader
 		{
 			try
 			{
-				Files.createDirectories(queueFile.toAbsolutePath().getParent());
 				StringBuilder text = new StringBuilder();
 				for (String line : lines)
 				{
 					text.append(line).append('\n');
 				}
-				Files.write(queueFile, text.toString().getBytes(StandardCharsets.UTF_8),
-					StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+				files.append(FlipprFiles.UPLOAD_QUEUE, text.toString());
 				queuedCount = countLines();
 			}
 			catch (IOException e)
 			{
-				log.warn("TradeUploader: could not write {}", queueFile, e);
+				log.warn("TradeUploader: could not write {}", FlipprFiles.UPLOAD_QUEUE, e);
 			}
 		}
 	}
@@ -275,19 +270,15 @@ public class TradeUploader
 	{
 		synchronized (fileLock)
 		{
-			if (!Files.exists(queueFile))
-			{
-				return new ArrayList<>();
-			}
 			try
 			{
-				List<String> lines = new ArrayList<>(Files.readAllLines(queueFile, StandardCharsets.UTF_8));
+				List<String> lines = new ArrayList<>(files.readLines(FlipprFiles.UPLOAD_QUEUE));
 				lines.removeIf(String::isEmpty);
 				return lines;
 			}
 			catch (IOException e)
 			{
-				log.warn("TradeUploader: could not read {}", queueFile, e);
+				log.warn("TradeUploader: could not read {}", FlipprFiles.UPLOAD_QUEUE, e);
 				return new ArrayList<>();
 			}
 		}
@@ -317,28 +308,33 @@ public class TradeUploader
 					kept.add(line);
 				}
 			}
+			Filepath queueFile = files.get(FlipprFiles.UPLOAD_QUEUE);
+			Filepath temp = files.get(FlipprFiles.UPLOAD_QUEUE + ".tmp");
+			if (queueFile == null || temp == null)
+			{
+				return;
+			}
 			try
 			{
-				Path temp = queueFile.resolveSibling(queueFile.getFileName() + ".tmp");
 				StringBuilder text = new StringBuilder();
 				for (String line : kept)
 				{
 					text.append(line).append('\n');
 				}
-				Files.write(temp, text.toString().getBytes(StandardCharsets.UTF_8));
+				FlipprFiles.writeString(temp, text.toString());
 				try
 				{
-					Files.move(temp, queueFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+					temp.moveTo(queueFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 				}
 				catch (AtomicMoveNotSupportedException e)
 				{
-					Files.move(temp, queueFile, StandardCopyOption.REPLACE_EXISTING);
+					temp.moveTo(queueFile, StandardCopyOption.REPLACE_EXISTING);
 				}
 				queuedCount = kept.size();
 			}
 			catch (IOException e)
 			{
-				log.warn("TradeUploader: could not rewrite {}", queueFile, e);
+				log.warn("TradeUploader: could not rewrite {}", FlipprFiles.UPLOAD_QUEUE, e);
 			}
 		}
 	}
