@@ -72,17 +72,18 @@ public class SuggestionOverlay extends Overlay
 	// once. DUMP_BUY leads - catching a live dump is the highest-priority
 	// action - ahead of even COLLECT, since a dump's window is measured in
 	// seconds and a collect can wait a few more.
-	// The rest follows the Regular Flipping ordering: finish a
-	// near-complete offer, then cut what's dead, then nudge what's
-	// drifting, then start fresh on an empty slot.
+	// The rest: finish a near-complete offer, then cut what's dead, then
+	// nudge what's drifting, then sell, then start fresh on an empty slot.
+	// HOLD ("leave this offer alone") is last: it has nothing to click, so
+	// it only shows when nothing else is due - never in place of a step.
 	private static final SuggestionType[] DISPLAY_PRIORITY = {
 		SuggestionType.DUMP_BUY,
 		SuggestionType.COLLECT,
 		SuggestionType.ABANDON,
-		SuggestionType.HOLD,
 		SuggestionType.MODIFY,
 		SuggestionType.SELL,
 		SuggestionType.START_NEW_FLIP,
+		SuggestionType.HOLD,
 	};
 
 	@Inject
