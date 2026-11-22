@@ -2,10 +2,13 @@ package com.flippr.osrs;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.GridLayout;
 import java.awt.Image;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -39,6 +42,7 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.util.LinkBrowser;
 import net.runelite.client.util.QuantityFormatter;
 
 // Sidebar - quick controls for the settings that matter moment-to-moment
@@ -70,6 +74,10 @@ public class FlipprPanel extends PluginPanel
 	private static final ImageIcon HIGHLIGHT_ICON = scaledIcon("icon_highlight.png");
 	private static final ImageIcon VERBOSE_ICON = scaledIcon("icon_verbose.png");
 	private static final ImageIcon TIMER_ICON = scaledIcon("icon_timer.png");
+
+	// Optional donation link at the bottom of the sidebar.
+	static final String SUPPORT_URL = "https://www.patreon.com/checkout/6ingRS?rid=30119754";
+	private static final ImageIcon PATREON_ICON = new ImageIcon(ImageUtil.loadImageResource(FlipprPanel.class, "icon_patreon.png"));
 
 	private static ImageIcon scaledIcon(String resourceName)
 	{
@@ -257,9 +265,47 @@ public class FlipprPanel extends PluginPanel
 		tabContent.setLayout(new BorderLayout());
 		tabContent.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		add(tabContent, BorderLayout.CENTER);
+		add(supportLink(), BorderLayout.SOUTH);
 
 		// PluginPanel's own scroll pane scrolls 1px per unit by default.
 		SidebarScroll.apply(getScrollPane());
+	}
+
+	// Small "Support Flippr on Patreon" row, shown under every tab.
+	private static JPanel supportLink()
+	{
+		JLabel link = new JLabel("Support Flippr on Patreon", PATREON_ICON, JLabel.LEFT);
+		link.setIconTextGap(6);
+		link.setFont(FontManager.getRunescapeSmallFont());
+		link.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+		link.setToolTipText("Flippr is free. If it helps you, you can support it on Patreon.");
+		link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+		link.addMouseListener(new MouseAdapter()
+		{
+			@Override
+			public void mouseClicked(MouseEvent e)
+			{
+				LinkBrowser.browse(SUPPORT_URL);
+			}
+
+			@Override
+			public void mouseEntered(MouseEvent e)
+			{
+				link.setForeground(ColorScheme.BRAND_ORANGE);
+			}
+
+			@Override
+			public void mouseExited(MouseEvent e)
+			{
+				link.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+			}
+		});
+
+		JPanel row = new JPanel(new BorderLayout());
+		row.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		row.setBorder(new EmptyBorder(8, 2, 2, 0));
+		row.add(link, BorderLayout.WEST);
+		return row;
 	}
 
 	private static final String[] TABS = {"plan", "tracker", "history", "prices"};

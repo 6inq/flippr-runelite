@@ -39,7 +39,11 @@ come from the [OSRS Wiki real-time prices API](https://prices.runescape.wiki).
 The plugin keeps a log of your own flips in RuneLite's plugin data folder (`.runelite/plugin-data/flippr`) on your computer. It is not uploaded unless
 you pair and sync.
 
-## Support
+## Support Flippr
+
+Flippr is free. If it helps you, you can support it on [Patreon](https://www.patreon.com/checkout/6ingRS?rid=30119754). Supporting doesn't unlock anything; every feature stays free for everyone.
+
+## Help
 
 Questions and bug reports: the Flippr Discord (link on [flippr.exchange](https://flippr.exchange)).
 
