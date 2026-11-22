@@ -666,6 +666,26 @@ public class ServerSuggestions
 		return limit(picks, freeSlots);
 	}
 
+	// The active plan has a position for this item (so the plan, not the
+	// local stale clock, decides about its offer). False without a plan or
+	// while offline.
+	public boolean isPlanItem(int itemId)
+	{
+		Data d = getData();
+		if (d == null || !d.hasPlan())
+		{
+			return false;
+		}
+		for (PlanPosition p : d.planPositions)
+		{
+			if (p.itemId == itemId)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// The plan's or the server's price for an item already in a slot, for
 	// MODIFY: the plan position's price when there is a plan, else the
 	// candidate's. Null when the server has nothing for this item.

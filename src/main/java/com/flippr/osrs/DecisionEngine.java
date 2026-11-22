@@ -468,6 +468,13 @@ public class DecisionEngine
 
 	// The plan's/server's price for MODIFY, only when it differs from what
 	// the offer is listed at now.
+	// Does this open offer follow the plan instead of the local clocks? A
+	// buy in sell-only mode doesn't: sell-only winds buys down as before.
+	static boolean followsPlan(boolean fillable, boolean buy, boolean sellOnly, boolean planItem)
+	{
+		return fillable && planItem && !(buy && sellOnly);
+	}
+
 	private Long modifyTargetPrice(SlotState s, boolean buy)
 	{
 		Long price = serverSuggestions.priceFor(s.itemId, buy);
@@ -509,6 +516,28 @@ public class DecisionEngine
 					i, s.itemName, s.quantitySold, s.totalQuantity
 				),
 				SuggestionType.COLLECT, i, s.itemId, s.itemName
+			);
+		}
+
+		// An offer for a plan position follows the plan: the plan sets its
+		// price and expects it to take the plan's fill time (often hours),
+		// and the website reprices it. So the minutes-based stale / step-down
+		// / hold rules below don't apply - they'd have the player cancel and
+		// re-list at the very same price. Only a different plan price is
+		// worth acting on (MODIFY to it); otherwise the offer is left alone.
+		boolean isBuyOffer = s.offerState == GrandExchangeOfferState.BUYING;
+		if (followsPlan(isFillableState(s.offerState), isBuyOffer, sellOnlyNow,
+			serverSuggestions != null && serverSuggestions.isPlanItem(s.itemId)))
+		{
+			Long target = modifyTargetPrice(s, isBuyOffer);
+			if (target == null)
+			{
+				return null;
+			}
+			return new Suggestion(
+				"MODIFY_PLAN:" + i + ":" + target,
+				String.format("slot %d: MODIFY (%s, plan price is now %d gp - change the offer to it)", i, s.itemName, target),
+				SuggestionType.MODIFY, i, s.itemId, s.itemName, target, null, !isBuyOffer
 			);
 		}
 
